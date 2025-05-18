@@ -13,9 +13,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useState, useEffect } from 'react';
 
 export function Header() {
   const { user, loading, logout } = useAuth();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const getInitials = (name?: string | null) => {
     if (!name) return '';
@@ -36,14 +42,14 @@ export function Header() {
           <Link href="/explore" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
             Explore
           </Link>
-          {user && (
+          {isClient && user && ( // Show profile link only if client mounted and user exists
             <Link href="/profile" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
               Profile
             </Link>
           )}
         </nav>
         <div className="flex items-center space-x-4">
-          {loading ? (
+          {loading || !isClient ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : user ? (
             <DropdownMenu>
