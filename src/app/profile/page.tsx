@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserCircle, Settings, Bookmark, Edit3, LogOut, Loader2, AlertTriangle } from "lucide-react";
 import { RecipeCard, type RecipeCardProps } from '@/components/recipe/RecipeCard';
@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase/config';
 import { collection, query, orderBy, getDocs, type Timestamp, doc, deleteDoc as firestoreDeleteDoc } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
+import Link from 'next/link';
 
 
 interface FirebaseSavedRecipe extends GenerateRecipeOutput {
@@ -47,6 +48,12 @@ export default function ProfilePage() {
         setIsLoadingRecipes(true);
         setErrorLoadingRecipes(null);
         try {
+          if (!db) {
+            setErrorLoadingRecipes("Firestore is not initialized. Please try again later.");
+            toast({ title: "Error", description: "Database connection not ready.", variant: "destructive" });
+            setIsLoadingRecipes(false);
+            return;
+          }
           const q = query(collection(db, "users", user.uid, "savedRecipes"), orderBy("savedAt", "desc"));
           const querySnapshot = await getDocs(q);
           const recipesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirebaseSavedRecipe));
@@ -64,7 +71,7 @@ export default function ProfilePage() {
   }, [user, toast]);
 
   const handleDeleteRecipe = async (recipeId: string) => {
-    if (!user) return;
+    if (!user || !db) return;
     try {
       await firestoreDeleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeId));
       setSavedRecipes(prev => prev.filter(r => r.id !== recipeId));
@@ -191,3 +198,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
