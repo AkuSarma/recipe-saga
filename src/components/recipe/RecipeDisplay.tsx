@@ -9,12 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
-// Note: If saveRecipeToFirestore is a server action, it needs to be imported differently
-// For now, assuming it's a client-callable function.
-// import { saveRecipeToFirestore, deleteRecipeFromFirestore, getSavedRecipesFromFirestore, SavedRecipe } from '@/lib/firebase/firestore';
-// ^ This will be tricky if firestore.ts uses "use server"
-
-// Let's define client-side interaction handlers here that would call server actions or client SDK.
 import { db } from '@/lib/firebase/config'; // For client-side SDK
 import { collection, addDoc, query, where, getDocs, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 
@@ -36,7 +30,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
   // Check if the current recipe (by title and cookTime for instance) is already saved
   useEffect(() => {
-    if (isSavedRecipe || !user || !recipe.title) return; // Already known or no user/title
+    if (isSavedRecipe || !user || !recipe.title || !db) return; // Already known or no user/title/db
 
     const checkSavedStatus = async () => {
       try {
@@ -67,6 +61,10 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       toast({ title: 'Authentication Required', description: 'Please log in to save recipes.', variant: 'destructive' });
       return;
     }
+    if (!db) {
+      toast({ title: 'Database Error', description: 'Firestore is not available. Please try again later.', variant: 'destructive' });
+      return;
+    }
     if (alreadySaved && savedRecipeId) { // If already saved, unsave it (delete)
       await handleDeleteRecipe(savedRecipeId, true); // Pass true to indicate it's an unsave action
       return;
@@ -74,15 +72,36 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
     setIsSaving(true);
     try {
-      const recipeToSave = {
-        ...recipe, // original recipe data
+      // Prepare the recipe data for saving, omitting potentially large imageUrl if it's a data URI
+      const recipeDataToSave: Omit<GenerateRecipeOutput, 'imageUrl'> & { 
+        userId: string; 
+        savedAt: any; 
+        originalImageUrl?: string; // To store the original data URI if needed, or a placeholder
+        imageUrl?: string; // Will only contain non-data URIs
+      } = {
+        title: recipe.title,
+        instructions: recipe.instructions,
+        cookTime: recipe.cookTime,
+        nutritionalInformation: recipe.nutritionalInformation,
         userId: user.uid,
         savedAt: serverTimestamp(),
       };
-      // remove id if it came from props to avoid confusion, Firestore will generate one
-      delete (recipeToSave as any).id; 
 
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'savedRecipes'), recipeToSave);
+      if (recipe.imageUrl && recipe.imageUrl.startsWith('data:image')) {
+        // Option 1: Store a placeholder or a flag indicating a generated image existed
+        recipeDataToSave.originalImageUrl = `placeholder:generatedImage`; // Or a more descriptive placeholder
+        // Option 2: Or simply don't save any imageUrl field if it's a data URI
+        // (No recipeDataToSave.imageUrl = ... line here for data URIs)
+        console.log("Image is a data URI, not saving to Firestore directly to avoid size issues.");
+      } else if (recipe.imageUrl) {
+        // If it's a regular URL, save it
+        recipeDataToSave.imageUrl = recipe.imageUrl;
+      }
+      
+      // remove id if it came from props to avoid confusion, Firestore will generate one
+      delete (recipeDataToSave as any).id; 
+
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'savedRecipes'), recipeDataToSave);
       toast({
         title: "Recipe Saved!",
         description: `${recipe.title} has been saved to your collection.`,
@@ -91,14 +110,17 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       setSavedRecipeId(docRef.id);
     } catch (error: any) {
       console.error("Error saving recipe:", error);
-      toast({ title: 'Failed to Save', description: error.message, variant: 'destructive' });
+      toast({ title: 'Failed to Save', description: error.message || "Could not save recipe.", variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteRecipe = async (recipeIdToDelete: string, isUnsaveAction: boolean = false) => {
-    if (!user || !recipeIdToDelete) return;
+    if (!user || !recipeIdToDelete || !db) {
+      if (!db) toast({ title: 'Database Error', description: 'Firestore is not available.', variant: 'destructive' });
+      return;
+    }
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
@@ -114,7 +136,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       setSavedRecipeId(undefined);
     } catch (error: any) {
       console.error("Error deleting recipe:", error);
-      toast({ title: 'Failed to Delete', description: error.message, variant: 'destructive' });
+      toast({ title: 'Failed to Delete', description: error.message || "Could not delete recipe.", variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
@@ -122,20 +144,21 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
 
   const recipeTitle = recipe.title || "Untitled Recipe";
-  const imageUrl = recipe.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(recipeTitle)}`;
+  // Use recipe.imageUrl for display, which might be the full data URI
+  const displayImageUrl = recipe.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(recipeTitle)}`;
 
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl overflow-hidden border-border">
       <CardHeader className="p-0">
         <div className="relative w-full h-64 md:h-80 xl:h-96">
           <Image
-            src={imageUrl}
+            src={displayImageUrl} // Use the original imageUrl for display
             alt={recipeTitle}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover"
             data-ai-hint="recipe food"
-            priority={!isSavedRecipe} // Only priority load if it's a newly generated one, not from a list
+            priority={!isSavedRecipe} 
           />
         </div>
         <div className="p-6">
