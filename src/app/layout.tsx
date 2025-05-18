@@ -28,7 +28,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen bg-background`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen bg-background`}
+        suppressHydrationWarning={true} 
+      >
         <AuthProvider> {/* Wrap with AuthProvider */}
           <Header />
           <main className="flex-grow container mx-auto px-4 py-8">
