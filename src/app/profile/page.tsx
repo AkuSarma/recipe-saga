@@ -10,20 +10,34 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-// Assuming getSavedRecipesFromFirestore is client-callable
-// import { getSavedRecipesFromFirestore, SavedRecipe, deleteRecipeFromFirestore } from '@/lib/firebase/firestore';
-
-// Using client-side SDK for Firestore directly
 import { db } from '@/lib/firebase/config';
 import { collection, query, orderBy, getDocs, type Timestamp, doc, deleteDoc as firestoreDeleteDoc } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 import Link from 'next/link';
+import Image from 'next/image';
 
 
 interface FirebaseSavedRecipe extends GenerateRecipeOutput {
-  id: string; // Firestore document ID
-  savedAt: Timestamp; // Firestore Timestamp
+  id: string; 
+  savedAt: Timestamp; 
   userId: string;
+}
+
+function SavedRecipeCardSkeleton() {
+  return (
+    <Card className="flex flex-col h-full rounded-xl border bg-card">
+      <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted">
+        <Image src="https://picsum.photos/400/300" alt="Loading recipe image" layout="fill" objectFit="cover" className="animate-pulse" data-ai-hint="placeholder food" />
+      </div>
+      <CardContent className="p-4 flex-grow space-y-2">
+        <div className="h-6 w-3/4 bg-muted animate-pulse rounded"></div>
+        <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
+      </CardContent>
+      <CardFooter className="p-4 border-t">
+        <div className="h-8 w-20 bg-muted animate-pulse rounded-md ml-auto"></div>
+      </CardFooter>
+    </Card>
+  );
 }
 
 
@@ -38,7 +52,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/auth?redirect=/profile'); // Redirect to login if not authenticated
+      router.replace('/auth?redirect=/profile'); 
     }
   }, [user, authLoading, router]);
 
@@ -113,7 +127,6 @@ export default function ProfilePage() {
               <CardTitle className="text-4xl font-bold text-foreground">{user?.displayName || 'Anonymous User'}</CardTitle>
               <CardDescription className="text-md text-muted-foreground mt-1">{user?.email}</CardDescription>
               <p className="text-sm text-muted-foreground mt-2">{userJoinedDate}</p>
-              {/* <p className="mt-3 text-foreground/80 max-w-md">{user.bio}</p> */}
             </div>
             <div className="flex flex-col sm:items-end gap-2 mt-4 sm:mt-0">
                <Button variant="outline" className="w-full sm:w-auto" disabled>
@@ -140,17 +153,7 @@ export default function ProfilePage() {
         {isLoadingRecipes ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(3)].map((_, index) => (
-              // Basic skeleton for recipe card
-              <Card key={index} className="flex flex-col h-full rounded-xl border bg-card">
-                <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted animate-pulse"></div>
-                <CardContent className="p-4 flex-grow space-y-2">
-                  <div className="h-6 w-3/4 bg-muted animate-pulse rounded"></div>
-                  <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
-                </CardContent>
-                <CardFooter className="p-4 border-t">
-                  <div className="h-8 w-20 bg-muted animate-pulse rounded-md ml-auto"></div>
-                </CardFooter>
-              </Card>
+              <SavedRecipeCardSkeleton key={index} />
             ))}
           </div>
         ) : errorLoadingRecipes ? (
@@ -168,15 +171,9 @@ export default function ProfilePage() {
                 key={recipe.id} 
                 id={recipe.id}
                 title={recipe.title}
-                imageUrl={recipe.imageUrl}
+                imageUrl={recipe.imageUrl || "https://picsum.photos/200/300"}
                 cookTime={recipe.cookTime}
-                // Convert Firestore timestamp to string or handle appropriately if needed
-                // author={recipe.author} // Assuming author might not be part of GenerateRecipeOutput
-                // likes={recipe.likes} // Assuming likes might not be part of GenerateRecipeOutput
                 dataAiHint="saved recipe food"
-                // Pass a delete handler to the RecipeCard if you add delete button there,
-                // or handle delete via a button on RecipeDisplay when navigating to the recipe detail.
-                // For now, let's imagine the RecipeDisplay opened from here would have the delete option.
               />
             ))}
           </div>
@@ -198,4 +195,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

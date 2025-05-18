@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,12 +24,12 @@ export function RecipeCard({ id, title, imageUrl, cookTime, author, likes, onLik
       <CardHeader className="p-0">
         <Link href={`/recipe/${id}`} className="block aspect-[4/3] relative overflow-hidden rounded-t-xl">
             <Image
-              src={imageUrl}
+              src={imageUrl || "https://picsum.photos/200/300"} // Fallback if imageUrl is somehow null/undefined
               alt={title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover transition-transform duration-300 hover:scale-105"
-              data-ai-hint={dataAiHint || "food item"}
+              data-ai-hint={dataAiHint || "recipe image placeholder"}
             />
         </Link>
       </CardHeader>
@@ -58,12 +59,6 @@ export function RecipeCard({ id, title, imageUrl, cookTime, author, likes, onLik
               <ThumbsUp className="h-4 w-4 text-primary" />
             </Button>
           )}
-          {/* Placeholder for dislike, or can be removed if not primary action */}
-          {/* {onDislike && (
-            <Button variant="outline" size="icon" onClick={onDislike} aria-label="Dislike recipe" className="h-8 w-8 border-destructive/50 hover:bg-destructive/10">
-              <ThumbsDown className="h-4 w-4 text-destructive" />
-            </Button>
-          )} */}
           <Button variant="ghost" size="sm" asChild className="text-primary hover:bg-primary/10 hover:text-primary">
             <Link href={`/recipe/${id}`}>
               <Eye className="mr-1.5 h-4 w-4" /> View

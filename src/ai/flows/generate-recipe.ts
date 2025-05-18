@@ -1,4 +1,5 @@
-// use server'
+
+'use server'
 
 /**
  * @fileOverview Recipe generation flow from a list of ingredients.
@@ -21,7 +22,7 @@ export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
 const GenerateRecipeOutputSchema = z.object({
   title: z.string().describe('The title of the recipe.'),
   instructions: z.string().describe('Step by step cooking instructions for the recipe.'),
-  imageUrl: z.string().describe('A URL of an image of the recipe.'),
+  imageUrl: z.string().describe('A URL of an image of the recipe. This will be https://picsum.photos/200/300.'),
   cookTime: z.string().describe('The estimated cooking time for the recipe.'),
   nutritionalInformation: z.string().describe('Nutritional information for the recipe.'),
 });
@@ -34,7 +35,7 @@ export async function generateRecipe(input: GenerateRecipeInput): Promise<Genera
 const recipePrompt = ai.definePrompt({
   name: 'recipePrompt',
   input: {schema: GenerateRecipeInputSchema},
-  output: {schema: GenerateRecipeOutputSchema},
+  output: {schema: GenerateRecipeOutputSchema.omit({ imageUrl: true })}, // LLM won't generate imageUrl
   prompt: `You are a world-class chef, skilled at creating delicious recipes from a provided list of ingredients.
 
   I will provide you a list of ingredients, and you will respond with a complete recipe, including:
@@ -42,7 +43,8 @@ const recipePrompt = ai.definePrompt({
   - Clear, step-by-step cooking instructions.
   - An estimated cook time.
   - Nutritional information.
-  - A prompt that can be used to generate an image of the recipe.
+
+  Do NOT suggest an image or image prompt.
 
   Ingredients: {{ingredients}}
   `,
@@ -55,20 +57,16 @@ const generateRecipeFlow = ai.defineFlow(
     outputSchema: GenerateRecipeOutputSchema,
   },
   async input => {
-    const recipe = await recipePrompt(input);
-    const imagePrompt = `Generate an image of ${recipe.output?.title}`;
-
-    const {media} = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-exp',
-      prompt: imagePrompt,
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-      },
-    });
+    const recipeDetails = await recipePrompt(input);
+    
+    if (!recipeDetails.output) {
+      throw new Error("Failed to generate recipe details from LLM.");
+    }
 
     return {
-      ...recipe.output!,
-      imageUrl: media.url,
+      ...recipeDetails.output,
+      imageUrl: "https://picsum.photos/200/300", // Always use picsum.photos
     };
   }
 );
+

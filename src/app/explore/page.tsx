@@ -6,25 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Search, Loader2, WifiOff, BookHeart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase/config';
-import { collection, query, getDocs, limit, type Timestamp } from 'firebase/firestore'; // Removed orderBy for now
+import { collection, query, getDocs, limit, type Timestamp, orderBy } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
+import Image from 'next/image';
 
-// Define the structure for recipes fetched from Firestore for the Explore page
-interface PublicRecipe extends Omit<GenerateRecipeOutput, 'imageUrl' | 'nutritionalInformation'> {
-  // id is not part of doc.data(), it's doc.id. This type represents doc.data().
+interface PublicRecipe extends Omit<GenerateRecipeOutput, 'nutritionalInformation'> {
   savedAt: Timestamp;
   authorDisplayName?: string;
-  authorId?: string; // Added authorId for completeness, though not directly used by card
-  imageUrl?: string;
-  // title, instructions, cookTime are inherited from GenerateRecipeOutput
+  authorId?: string;
 }
 
-
-// Skeleton for RecipeCard
 function RecipeCardSkeleton() {
   return (
     <div className="flex flex-col overflow-hidden shadow-lg h-full rounded-xl border bg-card">
-      <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted animate-pulse"></div>
+      <div className="aspect-[4/3] relative overflow-hidden rounded-t-xl bg-muted">
+        <Image src="https://picsum.photos/400/300" alt="Loading recipe image" layout="fill" objectFit="cover" className="animate-pulse" data-ai-hint="placeholder food" />
+      </div>
       <div className="p-4 flex-grow space-y-2">
         <div className="h-6 w-3/4 bg-muted animate-pulse rounded"></div>
         <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
@@ -40,7 +37,6 @@ function RecipeCardSkeleton() {
     </div>
   );
 }
-
 
 export default function ExplorePage() {
   const [recipes, setRecipes] = useState<RecipeCardProps[]>([]);
@@ -63,35 +59,40 @@ export default function ExplorePage() {
         console.log("Fetching from publicExploreRecipes...");
         const q = query(
           collection(db, "publicExploreRecipes"),
-          // orderBy("savedAt", "desc"), // Temporarily removed for diagnosis
+          orderBy("savedAt", "desc"), 
           limit(24)
         );
         const querySnapshot = await getDocs(q);
         console.log("Query snapshot empty:", querySnapshot.empty);
         console.log("Number of docs fetched:", querySnapshot.docs.length);
-        if (!querySnapshot.empty) {
-            console.log("First doc data:", querySnapshot.docs[0].data());
-        }
-
+        
         const fetchedRecipes = querySnapshot.docs.map(doc => {
           const data = doc.data() as PublicRecipe;
-          const recipeCardData = {
+          const recipeCardData: RecipeCardProps = {
             id: doc.id,
             title: data.title,
-            imageUrl: data.imageUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.title || 'Recipe')}`,
+            imageUrl: data.imageUrl || "https://picsum.photos/200/300",
             cookTime: data.cookTime,
             author: data.authorDisplayName || "Community Chef",
-            likes: Math.floor(Math.random() * 300), // Likes are currently mock for explore
-            dataAiHint: 'explore food recipe'
+            likes: Math.floor(Math.random() * 100), // Likes are currently mock for explore
+            dataAiHint: 'food recipe'
           };
-          console.log("Mapped recipe card data:", recipeCardData);
+          if (querySnapshot.docs.length > 0 && doc.id === querySnapshot.docs[0].id) {
+             console.log("First doc data from Firestore:", data);
+             console.log("Mapped first recipe card data:", recipeCardData);
+          }
           return recipeCardData;
         });
         setRecipes(fetchedRecipes);
       } catch (err: any) {
         console.error("Error fetching public recipes:", err);
-        setError(err.message || "Failed to load recipes for exploration.");
-        toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
+        if (err.code === 'failed-precondition') {
+             setError("Query requires an index. Please check Firestore console for index creation link or create manually: Collection 'publicExploreRecipes', Field 'savedAt', Order 'Descending'.");
+             toast({ title: "Indexing Required", description: "A database index is needed to show recipes. Check console.", variant: "destructive", duration: 10000 });
+        } else {
+            setError(err.message || "Failed to load recipes for exploration.");
+            toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
+        }
       } finally {
         setIsLoading(false);
       }
@@ -105,12 +106,10 @@ export default function ExplorePage() {
     (recipe.author && recipe.author.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Client-side like for demo purposes on explore page
   const handleLike = (id: string) => {
     toast({ title: "Liked!", description: `You liked recipe ${id}. (Demo)` });
     setRecipes(prevRecipes => prevRecipes.map(r => r.id === id ? {...r, likes: (r.likes || 0) + 1} : r));
   };
-
 
   return (
     <div className="space-y-8">
@@ -141,7 +140,7 @@ export default function ExplorePage() {
          <div className="text-center py-10 min-h-[30vh] flex flex-col justify-center items-center">
           <WifiOff className="h-16 w-16 text-destructive mb-4" />
           <p className="text-xl font-semibold text-foreground">Error Loading Recipes</p>
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground whitespace-pre-line">{error}</p>
         </div>
       ) : filteredRecipes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">

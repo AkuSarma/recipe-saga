@@ -1,3 +1,4 @@
+
 "use server";
 import { generateRecipe, type GenerateRecipeInput, type GenerateRecipeOutput } from "@/ai/flows/generate-recipe";
 
@@ -9,10 +10,7 @@ export async function handleGenerateRecipe(ingredients: string[]): Promise<Gener
   try {
     const input: GenerateRecipeInput = { ingredients };
     const recipe = await generateRecipe(input);
-    // Ensure imageUrl is always a string, use placeholder if not provided by AI
-    if (!recipe.imageUrl) {
-      recipe.imageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(recipe.title || 'Recipe Image')}`;
-    }
+    // imageUrl is now guaranteed by the flow
     return recipe;
   } catch (error) {
     console.error("Error generating recipe:", error);
@@ -23,3 +21,4 @@ export async function handleGenerateRecipe(ingredients: string[]): Promise<Gener
     return { error: errorMessage };
   }
 }
+

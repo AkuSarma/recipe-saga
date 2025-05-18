@@ -1,3 +1,4 @@
+
 "use client";
 import { useState } from 'react';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
@@ -5,14 +6,16 @@ import { RecipeForm } from '@/components/recipe/RecipeForm';
 import { RecipeDisplay } from '@/components/recipe/RecipeDisplay';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Sparkles } from 'lucide-react'; // Sparkles for initial state/loading
+import { AlertTriangle, Sparkles } from 'lucide-react'; 
+import Image from 'next/image';
 
-// Skeleton for RecipeDisplay
 function RecipeDisplaySkeleton() {
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl overflow-hidden">
       <CardContent className="p-0">
-        <div className="relative w-full h-64 md:h-80 xl:h-96 bg-muted animate-pulse"></div>
+        <div className="relative w-full aspect-[16/9] bg-muted">
+           <Image src="https://picsum.photos/800/450" alt="Loading recipe image" layout="fill" objectFit="cover" className="animate-pulse" data-ai-hint="placeholder food" />
+        </div>
         <div className="p-6 space-y-4">
           <div className="h-8 w-3/4 bg-muted animate-pulse rounded-md"></div>
           <div className="flex gap-4">
@@ -39,7 +42,6 @@ function RecipeDisplaySkeleton() {
     </Card>
   );
 }
-
 
 export default function HomePage() {
   const [generatedRecipe, setGeneratedRecipe] = useState<GenerateRecipeOutput | null>(null);

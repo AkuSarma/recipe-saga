@@ -10,13 +10,15 @@ import { AlertTriangle } from 'lucide-react';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
+import Image from 'next/image';
 
-// Skeleton for RecipeDisplay on detail page
 function RecipeDetailSkeleton() {
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl overflow-hidden">
       <CardHeader className="p-0">
-        <Skeleton className="relative w-full h-64 md:h-80 xl:h-96" />
+        <div className="relative w-full aspect-[16/9] bg-muted">
+          <Image src="https://picsum.photos/800/450" alt="Loading recipe image" layout="fill" objectFit="cover" className="animate-pulse" data-ai-hint="placeholder food" />
+        </div>
         <div className="p-6">
           <Skeleton className="h-10 w-3/4 mb-3" />
           <div className="flex gap-4">
@@ -44,7 +46,6 @@ function RecipeDetailSkeleton() {
   );
 }
 
-
 export default function RecipeDetailPage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
@@ -62,7 +63,7 @@ export default function RecipeDetailPage() {
     }
 
     if (authLoading) {
-      setIsLoading(true); // Keep showing skeleton while auth is resolving
+      setIsLoading(true); 
       return;
     }
 
@@ -81,7 +82,6 @@ export default function RecipeDetailPage() {
       let docPath = "";
 
       try {
-        // Try fetching from publicExploreRecipes first
         docPath = `publicExploreRecipes/${id}`;
         const publicRecipeDocRef = doc(db, 'publicExploreRecipes', id);
         docSnap = await getDoc(publicRecipeDocRef);
@@ -91,12 +91,11 @@ export default function RecipeDetailPage() {
           fetchedData = {
             title: data.title,
             instructions: data.instructions,
-            imageUrl: data.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(data.title || 'Recipe')}`,
+            imageUrl: data.imageUrl || "https://picsum.photos/200/300",
             cookTime: data.cookTime,
-            nutritionalInformation: data.nutritionalInformation,
+            nutritionalInformation: data.nutritionalInformation, 
           };
         } else if (user) {
-          // If not in public and user is logged in, try fetching from user's savedRecipes
           docPath = `users/${user.uid}/savedRecipes/${id}`;
           const userRecipeDocRef = doc(db, 'users', user.uid, 'savedRecipes', id);
           docSnap = await getDoc(userRecipeDocRef);
@@ -105,7 +104,7 @@ export default function RecipeDetailPage() {
             fetchedData = {
               title: data.title,
               instructions: data.instructions,
-              imageUrl: data.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(data.title || 'Recipe')}`,
+              imageUrl: data.imageUrl || "https://picsum.photos/200/300",
               cookTime: data.cookTime,
               nutritionalInformation: data.nutritionalInformation,
             };
@@ -113,7 +112,7 @@ export default function RecipeDetailPage() {
         }
 
         if (fetchedData) {
-          setRecipe({ ...fetchedData, id: id }); // Pass the original ID for context in RecipeDisplay
+          setRecipe({ ...fetchedData, id: id }); 
         } else {
           setError(`Recipe with ID "${id}" not found.`);
         }
@@ -154,8 +153,7 @@ export default function RecipeDetailPage() {
 
   return (
     <div>
-      {/* The 'id' prop on 'recipe' passed to RecipeDisplay is used for save/unsave/delete actions */}
-      <RecipeDisplay recipe={recipe} />
+      <RecipeDisplay recipe={recipe} isSavedRecipe={!!(recipe && recipe.id && user)} />
     </div>
   );
 }
