@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Utensils, UserCircle, LogOut, Loader2 } from 'lucide-react'; // Utensils could be updated if MoodMunch has a different logo idea
+import { Utensils, UserCircle, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   DropdownMenu,
@@ -31,10 +31,10 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <Utensils className="h-6 w-6 text-primary" /> {/* Consider changing Utensils if a new logo is desired */}
-          <span className="font-bold text-xl text-foreground">MoodMunch</span> {/* Updated name */}
-        </Link>
+        <a href="https://github.com/your-username/moodmunch" target="_blank" rel="noopener noreferrer" className="mr-6 flex items-center space-x-2 group">
+          <Utensils className="h-6 w-6 text-primary group-hover:text-primary/80 transition-colors" />
+          <span className="font-bold text-xl text-foreground group-hover:text-primary transition-colors">MoodMunch</span>
+        </a>
         <nav className="flex flex-1 items-center space-x-4 lg:space-x-6">
           <Link href="/" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
             Generate
