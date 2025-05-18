@@ -5,7 +5,7 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase/config';
+import { auth as firebaseAuthInstance } from '@/lib/firebase/config'; // Renamed to avoid conflict
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,16 +24,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    // Check if firebaseAuthInstance is initialized
+    if (!firebaseAuthInstance) {
+      console.error("Firebase auth is not initialized. Cannot set up onAuthStateChanged listener.");
+      setLoading(false); // Stop loading, user will remain null
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(firebaseAuthInstance, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
+    
+    // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, []);
+  }, []); // Empty dependency array: runs once on mount and cleans up on unmount
 
   const logout = async () => {
+    if (!firebaseAuthInstance) {
+      toast({ title: 'Logout Failed', description: 'Firebase not initialized.', variant: 'destructive' });
+      return;
+    }
     try {
-      await firebaseSignOut(auth);
+      await firebaseSignOut(firebaseAuthInstance);
       toast({ title: 'Logged out successfully.' });
       router.push('/'); // Redirect to home page after logout
     } catch (error) {
