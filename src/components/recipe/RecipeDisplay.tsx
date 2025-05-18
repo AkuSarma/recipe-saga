@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase/config'; // For client-side SDK
-import { collection, addDoc, query, where, getDocs, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, serverTimestamp, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 
 
 interface RecipeDisplayProps {
@@ -28,16 +28,15 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
   const [savedRecipeId, setSavedRecipeId] = useState<string | undefined>(recipe.id);
 
 
-  // Check if the current recipe (by title and cookTime for instance) is already saved
+  // Check if the current recipe (by title and cookTime for instance) is already saved by this user
   useEffect(() => {
-    if (isSavedRecipe || !user || !recipe.title || !db) return; // Already known or no user/title/db
+    if (isSavedRecipe || !user || !recipe.title || !db) return; 
 
     const checkSavedStatus = async () => {
       try {
         const q = query(
           collection(db, "users", user.uid, "savedRecipes"),
           where("title", "==", recipe.title),
-          // You might want to add more fields to ensure uniqueness, e.g., cookTime
           // where("cookTime", "==", recipe.cookTime) 
         );
         const querySnapshot = await getDocs(q);
@@ -65,19 +64,22 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       toast({ title: 'Database Error', description: 'Firestore is not available. Please try again later.', variant: 'destructive' });
       return;
     }
-    if (alreadySaved && savedRecipeId) { // If already saved, unsave it (delete)
-      await handleDeleteRecipe(savedRecipeId, true); // Pass true to indicate it's an unsave action
+    if (alreadySaved && savedRecipeId) { 
+      await handleDeleteRecipe(savedRecipeId, true); 
       return;
     }
 
     setIsSaving(true);
     try {
-      // Prepare the recipe data for saving, omitting potentially large imageUrl if it's a data URI
-      const recipeDataToSave: Omit<GenerateRecipeOutput, 'imageUrl'> & { 
+      const batch = writeBatch(db);
+
+      // 1. Save to user's private collection
+      const userRecipeRef = doc(collection(db, 'users', user.uid, 'savedRecipes'));
+      const recipeDataToSaveForUser: Omit<GenerateRecipeOutput, 'imageUrl'> & { 
         userId: string; 
         savedAt: any; 
-        originalImageUrl?: string; // To store the original data URI if needed, or a placeholder
-        imageUrl?: string; // Will only contain non-data URIs
+        originalImageUrl?: string; 
+        imageUrl?: string; 
       } = {
         title: recipe.title,
         instructions: recipe.instructions,
@@ -88,26 +90,50 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       };
 
       if (recipe.imageUrl && recipe.imageUrl.startsWith('data:image')) {
-        // Option 1: Store a placeholder or a flag indicating a generated image existed
-        recipeDataToSave.originalImageUrl = `placeholder:generatedImage`; // Or a more descriptive placeholder
-        // Option 2: Or simply don't save any imageUrl field if it's a data URI
-        // (No recipeDataToSave.imageUrl = ... line here for data URIs)
-        console.log("Image is a data URI, not saving to Firestore directly to avoid size issues.");
+        recipeDataToSaveForUser.originalImageUrl = `placeholder:generatedImage`; 
+        console.log("User Save: Image is a data URI, not saving to Firestore directly.");
       } else if (recipe.imageUrl) {
-        // If it's a regular URL, save it
-        recipeDataToSave.imageUrl = recipe.imageUrl;
+        recipeDataToSaveForUser.imageUrl = recipe.imageUrl;
       }
       
-      // remove id if it came from props to avoid confusion, Firestore will generate one
-      delete (recipeDataToSave as any).id; 
+      delete (recipeDataToSaveForUser as any).id; 
+      batch.set(userRecipeRef, recipeDataToSaveForUser);
+      
+      // 2. Save to public collection for Explore page
+      // We use a new doc ref for publicExploreRecipes to get a new unique ID.
+      const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
+       const recipeDataForPublic: Omit<GenerateRecipeOutput, 'imageUrl'> & {
+        savedAt: any;
+        authorDisplayName?: string; // Store display name of user who saved it
+        authorId?: string; // Store UID of user who saved it
+        originalImageUrl?: string;
+        imageUrl?: string;
+      } = {
+        title: recipe.title,
+        instructions: recipe.instructions, // Potentially shorten or omit for explore card? For now, full.
+        cookTime: recipe.cookTime,
+        nutritionalInformation: recipe.nutritionalInformation, // Potentially shorten or omit.
+        savedAt: serverTimestamp(), // Or a specific "publishedAt" timestamp
+        authorDisplayName: user.displayName || "Anonymous Chef",
+        authorId: user.uid,
+      };
 
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'savedRecipes'), recipeDataToSave);
+      if (recipe.imageUrl && recipe.imageUrl.startsWith('data:image')) {
+        recipeDataForPublic.originalImageUrl = `placeholder:generatedImage`;
+        console.log("Public Save: Image is a data URI, not saving to Firestore directly.");
+      } else if (recipe.imageUrl) {
+        recipeDataForPublic.imageUrl = recipe.imageUrl;
+      }
+      batch.set(publicRecipeRef, recipeDataForPublic);
+
+      await batch.commit();
+
       toast({
         title: "Recipe Saved!",
-        description: `${recipe.title} has been saved to your collection.`,
+        description: `${recipe.title} has been saved to your collection and is now discoverable.`,
       });
       setAlreadySaved(true);
-      setSavedRecipeId(docRef.id);
+      setSavedRecipeId(userRecipeRef.id); // Set the ID from the user's saved recipe document
     } catch (error: any) {
       console.error("Error saving recipe:", error);
       toast({ title: 'Failed to Save', description: error.message || "Could not save recipe.", variant: 'destructive' });
@@ -123,6 +149,8 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     }
     setIsDeleting(true);
     try {
+      // For now, "unsave" only removes from the user's private list.
+      // Removing from publicExploreRecipes would require more complex logic if other users also saved it.
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
       toast({
         title: isUnsaveAction ? "Recipe Unsaved" : "Recipe Deleted",
@@ -132,7 +160,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       if (onDelete && !isUnsaveAction) {
         onDelete(recipeIdToDelete);
       }
-      setAlreadySaved(false); // Reset saved state
+      setAlreadySaved(false); 
       setSavedRecipeId(undefined);
     } catch (error: any) {
       console.error("Error deleting recipe:", error);
@@ -144,7 +172,6 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
 
   const recipeTitle = recipe.title || "Untitled Recipe";
-  // Use recipe.imageUrl for display, which might be the full data URI
   const displayImageUrl = recipe.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(recipeTitle)}`;
 
   return (
@@ -152,7 +179,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       <CardHeader className="p-0">
         <div className="relative w-full h-64 md:h-80 xl:h-96">
           <Image
-            src={displayImageUrl} // Use the original imageUrl for display
+            src={displayImageUrl} 
             alt={recipeTitle}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -234,3 +261,5 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     </Card>
   );
 }
+
+    

@@ -1,66 +1,25 @@
+
 "use client"; 
 import { useState, useEffect } from 'react';
 import { RecipeCard, type RecipeCardProps } from '@/components/recipe/RecipeCard';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, WifiOff } from 'lucide-react';
+import { Search, Loader2, WifiOff, BookHeart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase/config';
+import { collection, query, orderBy, getDocs, limit, type Timestamp } from 'firebase/firestore';
+import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 
-const mockRecipesData: RecipeCardProps[] = [
-  {
-    id: '1',
-    title: 'Spaghetti Carbonara Classic',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '30 mins',
-    author: 'Chef Giovanni',
-    likes: 120,
-    dataAiHint: 'pasta dish'
-  },
-  {
-    id: '2',
-    title: 'Avocado Toast Deluxe',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '10 mins',
-    author: 'Healthy Bites',
-    likes: 250,
-    dataAiHint: 'breakfast food'
-  },
-  {
-    id: '3',
-    title: 'Chocolate Lava Cake',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '25 mins',
-    author: 'Sweet Treats',
-    likes: 300,
-    dataAiHint: 'dessert chocolate'
-  },
-  {
-    id: '4',
-    title: 'Grilled Salmon with Asparagus',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '40 mins',
-    author: 'SeaFood Lover',
-    likes: 180,
-    dataAiHint: 'fish meal'
-  },
-  {
-    id: '5',
-    title: 'Vegan Buddha Bowl Extravaganza',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '35 mins',
-    author: 'Plant Power',
-    likes: 220,
-    dataAiHint: 'vegan bowl'
-  },
-  {
-    id: '6',
-    title: 'Classic Beef Tacos Fiesta',
-    imageUrl: 'https://placehold.co/400x300.png',
-    cookTime: '45 mins',
-    author: 'Mexican Fiesta',
-    likes: 195,
-    dataAiHint: 'mexican food'
-  }
-];
+// Define the structure for recipes fetched from Firestore for the Explore page
+interface PublicRecipe extends Omit<GenerateRecipeOutput, 'imageUrl' | 'nutritionalInformation'> {
+  id: string; // Firestore document ID
+  savedAt: Timestamp; 
+  authorDisplayName?: string;
+  // imageUrl might be missing if it was a data URI, RecipeCard handles placeholder
+  imageUrl?: string; 
+  // We might not need full nutritional info or instructions on the card for explore page
+  // Add other fields if they are stored in 'publicExploreRecipes' and needed for RecipeCard
+}
+
 
 // Skeleton for RecipeCard
 function RecipeCardSkeleton() {
@@ -88,31 +47,62 @@ export default function ExplorePage() {
   const [recipes, setRecipes] = useState<RecipeCardProps[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate fetching data
-    const timer = setTimeout(() => {
-      setRecipes(mockRecipesData);
-      setIsLoading(false);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchPublicRecipes = async () => {
+      if (!db) {
+        setError("Database not initialized. Please try again later.");
+        setIsLoading(false);
+        toast({title: "Error", description: "Could not connect to the database.", variant: "destructive"});
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        const q = query(
+          collection(db, "publicExploreRecipes"), 
+          orderBy("savedAt", "desc"), 
+          limit(24) // Fetch latest 24 recipes for explore page
+        );
+        const querySnapshot = await getDocs(q);
+        const fetchedRecipes = querySnapshot.docs.map(doc => {
+          const data = doc.data() as PublicRecipe; // Cast to our expected structure
+          return {
+            id: doc.id,
+            title: data.title,
+            imageUrl: data.imageUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.title || 'Recipe')}`, // Fallback image
+            cookTime: data.cookTime,
+            author: data.authorDisplayName || "Community Chef", // Use authorDisplayName
+            likes: Math.floor(Math.random() * 300), // Likes are currently mock for explore
+            dataAiHint: 'explore food recipe'
+          };
+        });
+        setRecipes(fetchedRecipes);
+      } catch (err: any) {
+        console.error("Error fetching public recipes:", err);
+        setError(err.message || "Failed to load recipes for exploration.");
+        toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPublicRecipes();
+  }, [toast]);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (recipe.author && recipe.author.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Client-side like for demo purposes on explore page
   const handleLike = (id: string) => {
     toast({ title: "Liked!", description: `You liked recipe ${id}. (Demo)` });
     setRecipes(prevRecipes => prevRecipes.map(r => r.id === id ? {...r, likes: (r.likes || 0) + 1} : r));
   };
 
-  // const handleDislike = (id: string) => {
-  //   toast({ title: "Disliked", description: `You disliked recipe ${id}. (Demo)`, variant: "destructive" });
-  //   // Example: setRecipes(prevRecipes => prevRecipes.map(r => r.id === id ? {...r, likes: Math.max(0, (r.likes || 0) -1) } : r));
-  // };
 
   return (
     <div className="space-y-8">
@@ -139,6 +129,12 @@ export default function ExplorePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">
           {[...Array(6)].map((_, index) => <RecipeCardSkeleton key={index} />)}
         </div>
+      ) : error ? (
+         <div className="text-center py-10 min-h-[30vh] flex flex-col justify-center items-center">
+          <WifiOff className="h-16 w-16 text-destructive mb-4" />
+          <p className="text-xl font-semibold text-foreground">Error Loading Recipes</p>
+          <p className="text-muted-foreground">{error}</p>
+        </div>
       ) : filteredRecipes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">
           {filteredRecipes.map((recipe) => (
@@ -146,17 +142,18 @@ export default function ExplorePage() {
               key={recipe.id}
               {...recipe}
               onLike={() => handleLike(recipe.id)}
-              // onDislike={() => handleDislike(recipe.id)} // Dislike button removed from card for simplicity
             />
           ))}
         </div>
       ) : (
         <div className="text-center py-10 min-h-[30vh] flex flex-col justify-center items-center">
-          <WifiOff className="h-16 w-16 text-muted-foreground mb-4" />
-          <p className="text-xl font-semibold text-foreground">No Recipes Found</p>
-          <p className="text-muted-foreground">Try a different search term or check back later!</p>
+          <BookHeart className="h-16 w-16 text-muted-foreground mb-4" />
+          <p className="text-xl font-semibold text-foreground">No Community Recipes Yet</p>
+          <p className="text-muted-foreground">Be the first to save a recipe and share it with the community!</p>
         </div>
       )}
     </div>
   );
 }
+
+    
