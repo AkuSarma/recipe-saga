@@ -4,7 +4,7 @@ import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { Clock, Flame, Heart, BookOpenText, Info, Loader2, Trash2 } from 'lucide-react';
+import { Clock, Flame, Heart, BookOpenText, Info, Loader2, Trash2 } from 'lucide-react'; // Added Trash2
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
@@ -52,7 +52,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       }
     };
     checkSavedStatus();
-  }, [user, recipe.title, recipe.cookTime, isSavedRecipe]); // Added recipe.cookTime dependency
+  }, [user, recipe.title, recipe.cookTime, isSavedRecipe]);
 
 
   const handleSaveRecipe = async () => {
@@ -62,11 +62,13 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       console.log('[RecipeDisplay] handleSaveRecipe: User not authenticated.');
       return;
     }
+    console.log('[RecipeDisplay] handleSaveRecipe: User authenticated:', user.uid, user.displayName);
     if (!db) {
       toast({ title: 'Database Error', description: 'Firestore is not available. Please try again later.', variant: 'destructive' });
       console.log('[RecipeDisplay] handleSaveRecipe: Firestore (db) not available.');
       return;
     }
+    console.log('[RecipeDisplay] handleSaveRecipe: Firestore (db) available.');
     
     console.log('[RecipeDisplay] handleSaveRecipe: Initial state - AlreadySaved:', alreadySaved, 'SavedRecipeId:', savedRecipeId);
 
@@ -87,6 +89,8 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         cookTime: recipe.cookTime,
         nutritionalInformation: recipe.nutritionalInformation,
       };
+      console.log('[RecipeDisplay] handleSaveRecipe: Base recipe data:', JSON.stringify(baseRecipeData));
+
 
       // 1. Save to user's private collection
       const userRecipeRef = doc(collection(db, 'users', user.uid, 'savedRecipes'));
@@ -96,42 +100,47 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         savedAt: serverTimestamp(),
       };
 
+      // Handle imageUrl: if it's a data URI, we might store a placeholder or skip it for user's direct save.
+      // For now, if it's a data URI, let's save a note but not the URI itself to prevent large docs.
+      // The actual image is generated and displayed on the client already.
       if (recipe.imageUrl && recipe.imageUrl.startsWith('data:image')) {
-        recipeDataToSaveForUser.originalImageUrl = `placeholder:generatedImage`; 
-        console.log("[RecipeDisplay] User Save: Image is a data URI, setting originalImageUrl.");
+        recipeDataToSaveForUser.originalImageUrl = `placeholder:generatedImage-${Date.now()}`; 
+        // We don't set 'imageUrl' to the data URI here to avoid Firestore document size issues.
+        // The component already displays the data URI from the 'recipe' prop.
+        console.log("[RecipeDisplay] User Save: Image is a data URI. Not saving full data URI to user's private recipe. Original shown from prop.");
       } else if (recipe.imageUrl) {
-        recipeDataToSaveForUser.imageUrl = recipe.imageUrl;
+        recipeDataToSaveForUser.imageUrl = recipe.imageUrl; // It's a regular URL
         console.log("[RecipeDisplay] User Save: Image is a URL, setting imageUrl.");
       } else {
-        console.log("[RecipeDisplay] User Save: No imageUrl provided for recipe.");
+         recipeDataToSaveForUser.imageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(recipe.title || 'Recipe')}`;
+        console.log("[RecipeDisplay] User Save: No imageUrl provided for recipe, using placeholder for user save.");
       }
       
       console.log('[RecipeDisplay] handleSaveRecipe: Data for user save:', JSON.stringify(recipeDataToSaveForUser));
       batch.set(userRecipeRef, recipeDataToSaveForUser);
       
-      // 2. Save to public collection for Explore page
+      // 2. Save to public collection for Explore page - SIMPLIFIED DATA
       const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
+      // Ensure only necessary and size-appropriate data is saved publicly.
       const recipeDataForPublic: any = {
-        ...baseRecipeData,
-        savedAt: serverTimestamp(), 
-        authorDisplayName: user.displayName || "Anonymous Chef",
+        title: recipe.title || "Unnamed Recipe",
+        savedAt: serverTimestamp(),
         authorId: user.uid,
+        authorDisplayName: user.displayName || "Community Chef",
+        cookTime: recipe.cookTime || "N/A",
+        // For public recipes, always ensure imageUrl is a URL, not a data URI.
+        // If original is data URI, use a placeholder. If it's a URL, use it. If null, use placeholder.
+        imageUrl: (recipe.imageUrl && !recipe.imageUrl.startsWith('data:image'))
+          ? recipe.imageUrl
+          : `https://placehold.co/400x300.png?text=${encodeURIComponent(recipe.title || 'Explore')}`,
+        // nutritionalInformation and full instructions are often too large or not needed for public listings.
+        // instructions: recipe.instructions ? recipe.instructions.substring(0, 200) + '...' : "No instructions preview.", // Example: truncated instructions
       };
 
-      if (recipe.imageUrl && recipe.imageUrl.startsWith('data:image')) {
-        recipeDataForPublic.originalImageUrl = `placeholder:generatedImage`;
-        console.log("[RecipeDisplay] Public Save: Image is a data URI, setting originalImageUrl.");
-      } else if (recipe.imageUrl) {
-        recipeDataForPublic.imageUrl = recipe.imageUrl;
-        console.log("[RecipeDisplay] Public Save: Image is a URL, setting imageUrl.");
-      } else {
-        console.log("[RecipeDisplay] Public Save: No imageUrl provided for recipe.");
-      }
-
-      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save:', JSON.stringify(recipeDataForPublic));
+      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (simplified):', JSON.stringify(recipeDataForPublic));
       batch.set(publicRecipeRef, recipeDataForPublic);
 
-      console.log('[RecipeDisplay] handleSaveRecipe: Attempting batch.commit()');
+      console.log('[RecipeDisplay] handleSaveRecipe: Attempting batch.commit() with user and public data.');
       await batch.commit();
       console.log('[RecipeDisplay] handleSaveRecipe: batch.commit() successful. UserRef ID:', userRecipeRef.id, 'PublicRef ID:', publicRecipeRef.id);
 
@@ -140,7 +149,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         description: `${recipe.title} has been saved to your collection and is now discoverable.`,
       });
       setAlreadySaved(true);
-      setSavedRecipeId(userRecipeRef.id); // Set the ID from the user's saved recipe document
+      setSavedRecipeId(userRecipeRef.id); // Store the ID of the recipe in the user's collection
     } catch (error: any) {
       console.error("[RecipeDisplay] Error saving recipe:", error);
       toast({ title: 'Failed to Save', description: error.message || "Could not save recipe.", variant: 'destructive' });
@@ -172,107 +181,116 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       setAlreadySaved(false); 
       setSavedRecipeId(undefined);
 
-      // Note: This does NOT currently delete from publicExploreRecipes if it was an unsave action.
-      // That would require finding the corresponding public document, which could be complex if IDs differ or multiple users saved it.
-      // For a full delete action (not just unsave), one might consider deleting from public too.
-
-    } catch (error: any) {
-      console.error("[RecipeDisplay] Error deleting recipe:", error);
-      toast({ title: 'Failed to Delete', description: error.message || "Could not delete recipe.", variant: 'destructive' });
+    } catch (error: any) { // This was the line with the error, now completed
+      console.error(`[RecipeDisplay] Error ${isUnsaveAction ? 'unsaving' : 'deleting'} recipe:`, error);
+      toast({
+        title: `Failed to ${isUnsaveAction ? 'Unsave' : 'Delete'}`,
+        description: error.message || `Could not ${isUnsaveAction ? 'unsave' : 'delete'} recipe.`,
+        variant: 'destructive'
+      });
     } finally {
       setIsDeleting(false);
-      console.log(`[RecipeDisplay] handleDeleteRecipe: Finished for ID ${recipeIdToDelete}.`);
+      console.log(`[RecipeDisplay] handleDeleteRecipe: Finished ${isUnsaveAction ? 'unsave' : 'delete'} attempt for ID ${recipeIdToDelete}.`);
     }
   };
 
-
-  const recipeTitle = recipe.title || "Untitled Recipe";
-  const displayImageUrl = recipe.imageUrl || `https://placehold.co/800x600.png?text=${encodeURIComponent(recipeTitle)}`;
-
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl overflow-hidden border-border">
-      <CardHeader className="p-0">
-        <div className="relative w-full h-64 md:h-80 xl:h-96">
-          <Image
-            src={displayImageUrl} 
-            alt={recipeTitle}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover"
-            data-ai-hint="recipe food"
-            priority={!isSavedRecipe} 
-          />
+      <CardHeader className="p-0 relative">
+        <div className="relative w-full aspect-[16/9] bg-muted">
+          {recipe.imageUrl ? (
+            <Image
+              src={recipe.imageUrl}
+              alt={recipe.title}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
+              className="object-cover"
+              data-ai-hint="recipe delicious food"
+              priority={!recipe.id} 
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center rounded-t-lg bg-muted">
+              <Flame className="h-16 w-16 text-muted-foreground" />
+            </div>
+          )}
         </div>
-        <div className="p-6">
-          <CardTitle className="text-3xl lg:text-4xl font-bold mb-3 text-foreground">{recipeTitle}</CardTitle>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            {recipe.cookTime && (
-              <Badge variant="outline" className="flex items-center gap-1.5 py-1 px-2.5 border-primary/50 text-primary">
-                <Clock className="h-4 w-4" />
-                <span>{recipe.cookTime}</span>
-              </Badge>
-            )}
-             <Badge variant="outline" className="flex items-center gap-1.5 py-1 px-2.5 border-accent/50 text-accent">
-                <Info className="h-4 w-4" />
-                <span>Details may vary</span>
-              </Badge>
-          </div>
+        <div className="p-6 pt-16 absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent flex flex-col justify-end">
+          <CardTitle className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">{recipe.title}</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="p-6 space-y-8">
-        <div>
-          <h3 className="text-2xl font-semibold mb-3 flex items-center text-primary">
-            <BookOpenText className="mr-2.5 h-6 w-6" />
-            Instructions
-          </h3>
-          <div className="prose prose-sm sm:prose-base max-w-none whitespace-pre-line text-foreground/90 leading-relaxed">
-            {recipe.instructions || "No instructions provided."}
-          </div>
+
+      <CardContent className="p-6 space-y-6">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground items-center">
+          {recipe.cookTime && (
+            <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-2.5 text-base rounded-md">
+              <Clock className="h-4 w-4" />
+              <span>{recipe.cookTime}</span>
+            </Badge>
+          )}
+           {/* Placeholder for servings or difficulty, can be added if AI provides it */}
+           {/* <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-2.5 text-base rounded-md">
+             <Flame className="h-4 w-4" />
+             <span>Serves 2-4</span> 
+           </Badge> */}
         </div>
-        
+
+        {recipe.instructions && (
+          <div>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center">
+              <BookOpenText className="mr-2 h-5 w-5 text-primary" />
+              Instructions
+            </h3>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/90 whitespace-pre-line leading-relaxed">
+              {recipe.instructions.split('\n').map((line, index) => (
+                <p key={index} className="mb-2 last:mb-0">{line}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
         {recipe.nutritionalInformation && (
           <div>
-            <h3 className="text-2xl font-semibold mb-3 flex items-center text-primary">
-              <Flame className="mr-2.5 h-6 w-6" />
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center">
+              <Info className="mr-2 h-5 w-5 text-primary" />
               Nutritional Information
             </h3>
-            <p className="text-sm sm:text-base text-foreground/90 whitespace-pre-line leading-relaxed">
+            <p className="text-sm text-foreground/90 whitespace-pre-line leading-relaxed">
               {recipe.nutritionalInformation}
             </p>
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-end p-6 bg-muted/30 border-t gap-3">
-        {user && isSavedRecipe && recipe.id && onDelete && (
-          <Button 
-            onClick={() => handleDeleteRecipe(recipe.id!)} 
-            variant="outline" 
-            className="text-destructive hover:bg-destructive/10 border-destructive/50 px-6 py-2.5 rounded-lg shadow-md transition-transform hover:scale-105"
-            disabled={isDeleting || authLoading}
+
+      {user && (
+        <CardFooter className="p-6 flex flex-col sm:flex-row justify-end gap-3 bg-muted/30 border-t">
+          {onDelete && recipe.id && !alreadySaved && ( // Show delete button only if it's a saved recipe being viewed (e.g., from profile) AND it's not just an unsave action covered by the other button.
+            <Button
+              onClick={() => handleDeleteRecipe(recipe.id!, false)}
+              variant="destructive"
+              className="w-full sm:w-auto"
+              disabled={isDeleting || isSaving || authLoading}
+            >
+              {isDeleting && !isSaving ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete Permanently
+            </Button>
+          )}
+          <Button
+            onClick={handleSaveRecipe}
+            variant={alreadySaved ? "outline" : "default"}
+            className="w-full sm:w-auto min-w-[150px]"
+            disabled={isSaving || isDeleting || authLoading}
           >
-            {isDeleting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Trash2 className="mr-2 h-5 w-5" />}
-            Delete
-          </Button>
-        )}
-        {user && (
-          <Button 
-            onClick={handleSaveRecipe} 
-            className={`${alreadySaved ? 'bg-muted text-muted-foreground hover:bg-muted/80' : 'bg-primary hover:bg-primary/90 text-primary-foreground'} px-6 py-2.5 rounded-lg shadow-md transition-transform hover:scale-105`}
-            disabled={isSaving || authLoading}
-          >
-            {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Heart className="mr-2 h-5 w-5" />}
+            {isSaving ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Heart className={alreadySaved ? "text-destructive fill-destructive" : ""} />
+            )}
             {alreadySaved ? 'Unsave Recipe' : 'Save Recipe'}
           </Button>
-        )}
-        {!user && !authLoading && (
-           <Button 
-            onClick={() => toast({title: 'Login Required', description: 'Please log in to save recipes.'})}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg shadow-md transition-transform hover:scale-105"
-          >
-            <Heart className="mr-2 h-5 w-5" /> Save Recipe
-          </Button>
-        )}
-      </CardFooter>
+        </CardFooter>
+      )}
     </Card>
   );
 }
+
+    
