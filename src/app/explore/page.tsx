@@ -1,23 +1,22 @@
 
-"use client"; 
+"use client";
 import { useState, useEffect } from 'react';
 import { RecipeCard, type RecipeCardProps } from '@/components/recipe/RecipeCard';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, WifiOff, BookHeart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase/config';
-import { collection, query, orderBy, getDocs, limit, type Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, limit, type Timestamp } from 'firebase/firestore'; // Removed orderBy for now
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 
 // Define the structure for recipes fetched from Firestore for the Explore page
 interface PublicRecipe extends Omit<GenerateRecipeOutput, 'imageUrl' | 'nutritionalInformation'> {
-  id: string; // Firestore document ID
-  savedAt: Timestamp; 
+  // id is not part of doc.data(), it's doc.id. This type represents doc.data().
+  savedAt: Timestamp;
   authorDisplayName?: string;
-  // imageUrl might be missing if it was a data URI, RecipeCard handles placeholder
-  imageUrl?: string; 
-  // We might not need full nutritional info or instructions on the card for explore page
-  // Add other fields if they are stored in 'publicExploreRecipes' and needed for RecipeCard
+  authorId?: string; // Added authorId for completeness, though not directly used by card
+  imageUrl?: string;
+  // title, instructions, cookTime are inherited from GenerateRecipeOutput
 }
 
 
@@ -61,23 +60,32 @@ export default function ExplorePage() {
       setIsLoading(true);
       setError(null);
       try {
+        console.log("Fetching from publicExploreRecipes...");
         const q = query(
-          collection(db, "publicExploreRecipes"), 
-          orderBy("savedAt", "desc"), 
-          limit(24) // Fetch latest 24 recipes for explore page
+          collection(db, "publicExploreRecipes"),
+          // orderBy("savedAt", "desc"), // Temporarily removed for diagnosis
+          limit(24)
         );
         const querySnapshot = await getDocs(q);
+        console.log("Query snapshot empty:", querySnapshot.empty);
+        console.log("Number of docs fetched:", querySnapshot.docs.length);
+        if (!querySnapshot.empty) {
+            console.log("First doc data:", querySnapshot.docs[0].data());
+        }
+
         const fetchedRecipes = querySnapshot.docs.map(doc => {
-          const data = doc.data() as PublicRecipe; // Cast to our expected structure
-          return {
+          const data = doc.data() as PublicRecipe;
+          const recipeCardData = {
             id: doc.id,
             title: data.title,
-            imageUrl: data.imageUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.title || 'Recipe')}`, // Fallback image
+            imageUrl: data.imageUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.title || 'Recipe')}`,
             cookTime: data.cookTime,
-            author: data.authorDisplayName || "Community Chef", // Use authorDisplayName
+            author: data.authorDisplayName || "Community Chef",
             likes: Math.floor(Math.random() * 300), // Likes are currently mock for explore
             dataAiHint: 'explore food recipe'
           };
+          console.log("Mapped recipe card data:", recipeCardData);
+          return recipeCardData;
         });
         setRecipes(fetchedRecipes);
       } catch (err: any) {
@@ -110,7 +118,7 @@ export default function ExplorePage() {
         <h1 className="text-4xl font-bold text-foreground">Explore Recipes</h1>
         <p className="text-muted-foreground mt-2">Discover new culinary inspirations from our community.</p>
       </div>
-      
+
       <div className="sticky top-16 md:top-20 z-40 py-4 bg-background/80 backdrop-blur-md -mx-4 px-4">
         <div className="relative max-w-lg mx-auto">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
@@ -155,5 +163,3 @@ export default function ExplorePage() {
     </div>
   );
 }
-
-    
