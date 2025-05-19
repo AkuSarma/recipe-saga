@@ -17,7 +17,7 @@ const GenerateRecipeInputSchema = z.object({
     z.string().describe('A list of ingredients available to use in the recipe.')
   ).describe('The ingredients to generate a recipe from.'),
   mood: z.string().optional().describe('The user\'s current mood to tailor the recipe. E.g., Happy, Comforting, Energetic, Quick & Easy.'),
-  dietaryPreference: z.enum(['Veg', 'Non-Veg', 'Any']).default('Any').optional().describe('The dietary preference for the recipe: Veg, Non-Veg, or Any.'),
+  dietaryPreference: z.enum(['Veg', 'Non-Veg', 'Vegan', 'Any']).default('Any').optional().describe('The dietary preference for the recipe: Veg, Non-Veg, Vegan, or Any.'),
 });
 export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
 
@@ -54,9 +54,11 @@ const recipePrompt = ai.definePrompt({
   {{#if dietaryPreference}}
   Dietary Preference: {{dietaryPreference}}.
   {{#if (eq dietaryPreference "Veg")}}
-  The recipe MUST be strictly vegetarian. Do not include any meat, poultry, or fish.
+  The recipe MUST be strictly vegetarian. Do not include any meat, poultry, or fish. It can include dairy and eggs.
   {{else if (eq dietaryPreference "Non-Veg")}}
   The recipe can include meat, poultry, or fish.
+  {{else if (eq dietaryPreference "Vegan")}}
+  The recipe MUST be strictly vegan. Do not include any meat, poultry, fish, dairy products (milk, cheese, butter, yogurt), eggs, or honey.
   {{else}}
   There are no specific dietary restrictions beyond the ingredients provided.
   {{/if}}
@@ -92,3 +94,4 @@ import Handlebars from 'handlebars';
 Handlebars.registerHelper('eq', function (a, b) {
   return a === b;
 });
+

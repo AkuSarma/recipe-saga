@@ -23,13 +23,13 @@ interface RecipeFormProps {
 }
 
 const moods = ["Happy", "Comforting", "Energetic", "Quick & Easy", "Adventurous", "Calm"];
-type DietaryPreference = "Veg" | "Non-Veg" | "Any";
+type DietaryPreference = "Veg" | "Non-Veg" | "Vegan" | "Any"; // Added 'Vegan'
 
-const NO_MOOD_SENTINEL_VALUE = "__NO_MOOD_SELECTED__"; // Unique value for the "None" SelectItem
+const NO_MOOD_SENTINEL_VALUE = "__NO_MOOD_SELECTED__"; 
 
 export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormProps) {
   const [ingredients, setIngredients] = useState<string[]>([]);
-  const [selectedMood, setSelectedMood] = useState<string>(""); // Empty string means placeholder / no mood
+  const [selectedMood, setSelectedMood] = useState<string>(""); 
   const [dietaryPreference, setDietaryPreference] = useState<DietaryPreference>("Any");
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
     try {
       const result = await handleGenerateRecipe(
         ingredients,
-        selectedMood || undefined, // Send undefined if selectedMood is ""
+        selectedMood || undefined, 
         dietaryPreference
       );
       if ('error' in result) {
@@ -85,7 +85,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
               value={selectedMood} 
               onValueChange={(value) => {
                 if (value === NO_MOOD_SENTINEL_VALUE) {
-                  setSelectedMood(""); // Set internal state to "" for "no mood"
+                  setSelectedMood(""); 
                 } else {
                   setSelectedMood(value);
                 }
@@ -122,6 +122,10 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
                 <RadioGroupItem value="Non-Veg" id="diet-nonveg" />
                 <Label htmlFor="diet-nonveg" className="font-normal">Non-Vegetarian</Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Vegan" id="diet-vegan" />
+                <Label htmlFor="diet-vegan" className="font-normal">Vegan</Label>
+              </div>
             </RadioGroup>
           </div>
           
@@ -141,3 +145,4 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
     </Card>
   );
 }
+

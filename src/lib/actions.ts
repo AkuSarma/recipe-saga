@@ -5,7 +5,7 @@ import { generateRecipe, type GenerateRecipeInput, type GenerateRecipeOutput } f
 export async function handleGenerateRecipe(
   ingredients: string[],
   mood?: string,
-  dietaryPreference?: 'Veg' | 'Non-Veg' | 'Any'
+  dietaryPreference?: 'Veg' | 'Non-Veg' | 'Vegan' | 'Any' // Added 'Vegan'
 ): Promise<GenerateRecipeOutput | { error: string }> {
   if (!ingredients || ingredients.length === 0) {
     return { error: "Please provide at least one ingredient." };
@@ -28,3 +28,4 @@ export async function handleGenerateRecipe(
     return { error: errorMessage };
   }
 }
+
