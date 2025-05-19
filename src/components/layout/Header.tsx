@@ -31,10 +31,10 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <Utensils className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl text-foreground">Recipe Sage</span>
-        </Link>
+        <a href="https://github.com/AkuSarma" target="_blank" rel="noopener noreferrer" className="mr-6 flex items-center space-x-2 group">
+          <Utensils className="h-6 w-6 text-primary group-hover:text-primary/80 transition-colors" />
+          <span className="font-bold text-xl text-foreground group-hover:text-primary transition-colors">MoodMunch</span>
+        </a>
         <nav className="flex flex-1 items-center space-x-4 lg:space-x-6">
           <Link href="/" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
             Generate
@@ -42,7 +42,7 @@ export function Header() {
           <Link href="/explore" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
             Explore
           </Link>
-          {isClient && user && ( // Show profile link only if client mounted and user exists
+          {isClient && user && (
             <Link href="/profile" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
               Profile
             </Link>
