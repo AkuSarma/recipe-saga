@@ -59,13 +59,13 @@ export default function ExplorePage() {
         console.log("Fetching from publicExploreRecipes...");
         const q = query(
           collection(db, "publicExploreRecipes"),
-          orderBy("savedAt", "desc"), 
+          orderBy("savedAt", "desc"),
           limit(24)
         );
         const querySnapshot = await getDocs(q);
         console.log("Query snapshot empty:", querySnapshot.empty);
         console.log("Number of docs fetched:", querySnapshot.docs.length);
-        
+
         const fetchedRecipes = querySnapshot.docs.map(doc => {
           const data = doc.data() as PublicRecipe;
           const recipeCardData: RecipeCardProps = {
@@ -114,8 +114,8 @@ export default function ExplorePage() {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-foreground">Explore Recipes</h1>
-        <p className="text-muted-foreground mt-2">Discover new culinary inspirations from our community.</p>
+        <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Explore Recipes</h1>
+        <p className="text-muted-foreground mt-2 text-sm sm:text-base">Discover new culinary inspirations from our community.</p>
       </div>
 
       <div className="sticky top-16 md:top-20 z-40 py-4 bg-background/80 backdrop-blur-md -mx-4 px-4">
@@ -126,7 +126,7 @@ export default function ExplorePage() {
             placeholder="Search recipes by title or author..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-lg text-base shadow-sm border-border focus:ring-primary"
+            className="w-full pl-12 pr-4 py-3 rounded-lg shadow-sm border-border focus:ring-primary"
             aria-label="Search recipes"
           />
         </div>

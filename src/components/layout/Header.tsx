@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ThemeToggle } from './ThemeToggle'; // Import ThemeToggle
+import { ThemeToggle } from './ThemeToggle';
 import { useState, useEffect } from 'react';
 
 export function Header() {
@@ -30,13 +30,13 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 items-center">
       <div className="container flex h-16 items-center">
-        <a href="https://github.com/AkuSarma" target="_blank" rel="noopener noreferrer" className="mr-6 flex items-center space-x-2 group">
+        <a href="https://github.com/AkuSarma/moodmunch" target="_blank" rel="noopener noreferrer" className="mr-4 md:mr-6 flex items-center space-x-2 group">
           <Utensils className="h-6 w-6 text-primary group-hover:text-primary/80 transition-colors" />
-          <span className="font-bold text-xl text-foreground group-hover:text-primary transition-colors">MoodMunch</span>
+          <span className="font-bold text-lg sm:text-xl text-foreground group-hover:text-primary transition-colors">MoodMunch</span>
         </a>
-        <nav className="flex flex-1 items-center space-x-4 lg:space-x-6">
+        <nav className="flex flex-1 items-center space-x-2 sm:space-x-4 lg:space-x-6">
           <Link href="/" className="text-sm font-medium text-foreground/70 transition-colors hover:text-foreground">
             Generate
           </Link>
@@ -49,8 +49,8 @@ export function Header() {
             </Link>
           )}
         </nav>
-        <div className="flex items-center space-x-2"> {/* Reduced space for tighter packing */}
-          <ThemeToggle /> {/* Add ThemeToggle button */}
+        <div className="flex items-center space-x-2">
+          <ThemeToggle />
           {loading || !isClient ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : user ? (

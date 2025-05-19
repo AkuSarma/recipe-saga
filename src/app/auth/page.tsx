@@ -26,11 +26,14 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      if (!auth || !db) { // Check if Firebase services are initialized
+        toast({ title: 'Initialization Error', description: 'Firebase services are not ready. Please try again later.', variant: 'destructive' });
+        setIsLoading(false);
+        return;
+      }
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // Update profile with display name
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName });
-        // Create user document in Firestore
         await setDoc(doc(db, "users", userCredential.user.uid), {
           uid: userCredential.user.uid,
           email: userCredential.user.email,
@@ -51,6 +54,11 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      if (!auth) { // Check if Firebase auth is initialized
+        toast({ title: 'Initialization Error', description: 'Firebase auth is not ready. Please try again later.', variant: 'destructive' });
+        setIsLoading(false);
+        return;
+      }
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Login Successful!', description: 'Welcome back!' });
       router.push('/profile');
@@ -62,7 +70,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+    <div className="flex justify-center items-center min-h-[calc(100vh-200px)] px-4">
       <Tabs defaultValue="login" className="w-full max-w-md">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
@@ -71,8 +79,8 @@ export default function AuthPage() {
         <TabsContent value="login">
           <Card>
             <CardHeader>
-              <CardTitle>Login</CardTitle>
-              <CardDescription>Access your account to view your saved recipes.</CardDescription>
+              <CardTitle className="text-xl sm:text-2xl">Login</CardTitle>
+              <CardDescription className="text-sm sm:text-base">Access your account to view your saved recipes.</CardDescription>
             </CardHeader>
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-4">
@@ -97,8 +105,8 @@ export default function AuthPage() {
         <TabsContent value="signup">
           <Card>
             <CardHeader>
-              <CardTitle>Sign Up</CardTitle>
-              <CardDescription>Create an account to start saving your favorite recipes.</CardDescription>
+              <CardTitle className="text-xl sm:text-2xl">Sign Up</CardTitle>
+              <CardDescription className="text-sm sm:text-base">Create an account to start saving your favorite recipes.</CardDescription>
             </CardHeader>
             <form onSubmit={handleSignUp}>
               <CardContent className="space-y-4">

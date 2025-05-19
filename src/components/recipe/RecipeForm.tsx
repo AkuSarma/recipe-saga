@@ -23,13 +23,13 @@ interface RecipeFormProps {
 }
 
 const moods = ["Happy", "Comforting", "Energetic", "Quick & Easy", "Adventurous", "Calm"];
-type DietaryPreference = "Veg" | "Non-Veg" | "Vegan" | "Any"; // Added 'Vegan'
+type DietaryPreference = "Veg" | "Non-Veg" | "Vegan" | "Any";
 
-const NO_MOOD_SENTINEL_VALUE = "__NO_MOOD_SELECTED__"; 
+const NO_MOOD_SENTINEL_VALUE = "__NO_MOOD_SELECTED__";
 
 export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormProps) {
   const [ingredients, setIngredients] = useState<string[]>([]);
-  const [selectedMood, setSelectedMood] = useState<string>(""); 
+  const [selectedMood, setSelectedMood] = useState<string>("");
   const [dietaryPreference, setDietaryPreference] = useState<DietaryPreference>("Any");
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
       onRecipeGenerated(null, "Please add at least one ingredient.");
       return;
     }
-    
+
     onSubmissionStart();
     setIsLoading(true);
     setFormError(null);
@@ -49,7 +49,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
     try {
       const result = await handleGenerateRecipe(
         ingredients,
-        selectedMood || undefined, 
+        selectedMood || undefined,
         dietaryPreference
       );
       if ('error' in result) {
@@ -70,8 +70,8 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
   return (
     <Card className="w-full max-w-xl mx-auto shadow-xl border-border">
       <CardHeader className="text-center">
-        <CardTitle className="text-3xl font-semibold text-foreground">Craft Your Next Meal</CardTitle>
-        <CardDescription className="text-muted-foreground">
+        <CardTitle className="text-2xl sm:text-3xl font-semibold text-foreground">Craft Your Next Meal</CardTitle>
+        <CardDescription className="text-muted-foreground text-sm sm:text-base">
           Match your mood and taste! Enter ingredients, select your mood and dietary preference, and let our AI chef inspire you!
         </CardDescription>
       </CardHeader>
@@ -81,11 +81,11 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
 
           <div className="space-y-2">
             <Label htmlFor="mood-select">What's your mood?</Label>
-            <Select 
-              value={selectedMood} 
+            <Select
+              value={selectedMood || NO_MOOD_SENTINEL_VALUE} // Ensure sentinel is used if selectedMood is ""
               onValueChange={(value) => {
                 if (value === NO_MOOD_SENTINEL_VALUE) {
-                  setSelectedMood(""); 
+                  setSelectedMood("");
                 } else {
                   setSelectedMood(value);
                 }
@@ -108,7 +108,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
             <RadioGroup
               value={dietaryPreference}
               onValueChange={(value) => setDietaryPreference(value as DietaryPreference)}
-              className="flex flex-col sm:flex-row gap-4"
+              className="flex flex-col sm:flex-row gap-4 pt-1"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="Any" id="diet-any" />
@@ -128,12 +128,12 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
               </div>
             </RadioGroup>
           </div>
-          
+
           {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
           <div className="flex justify-center pt-2">
-             <Button 
-                type="submit" 
-                disabled={isLoading || ingredients.length === 0} 
+             <Button
+                type="submit"
+                disabled={isLoading || ingredients.length === 0}
                 className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-3 text-base rounded-lg shadow-md transition-transform hover:scale-105"
               >
                 {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
@@ -145,4 +145,3 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
     </Card>
   );
 }
-

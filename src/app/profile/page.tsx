@@ -18,8 +18,8 @@ import Image from 'next/image';
 
 
 interface FirebaseSavedRecipe extends GenerateRecipeOutput {
-  id: string; 
-  savedAt: Timestamp; 
+  id: string;
+  savedAt: Timestamp;
   userId: string;
 }
 
@@ -52,7 +52,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/auth?redirect=/profile'); 
+      router.replace('/auth?redirect=/profile');
     }
   }, [user, authLoading, router]);
 
@@ -107,8 +107,8 @@ export default function ProfilePage() {
     if (!name) return '';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
-  
-  const userJoinedDate = user?.metadata.creationTime 
+
+  const userJoinedDate = user?.metadata.creationTime
     ? `Joined ${new Date(user.metadata.creationTime).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
     : 'Joined recently';
 
@@ -116,19 +116,19 @@ export default function ProfilePage() {
     <div className="space-y-8">
       <Card className="shadow-xl border-border">
         <CardHeader className="p-6">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <Avatar className="h-32 w-32 border-4 border-primary ring-2 ring-primary/30">
+          <div className="flex flex-col sm:flex-row items-center text-center sm:text-left gap-6">
+            <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-primary ring-2 ring-primary/30">
               <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || 'User'} data-ai-hint="profile human" />
-              <AvatarFallback className="text-4xl">
-                {user?.displayName ? getInitials(user.displayName) : <UserCircle className="h-16 w-16 text-muted-foreground" />}
+              <AvatarFallback className="text-3xl sm:text-4xl">
+                {user?.displayName ? getInitials(user.displayName) : <UserCircle className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground" />}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-grow text-center sm:text-left">
-              <CardTitle className="text-4xl font-bold text-foreground">{user?.displayName || 'Anonymous User'}</CardTitle>
-              <CardDescription className="text-md text-muted-foreground mt-1">{user?.email}</CardDescription>
-              <p className="text-sm text-muted-foreground mt-2">{userJoinedDate}</p>
+            <div className="flex-grow">
+              <CardTitle className="text-3xl sm:text-4xl font-bold text-foreground">{user?.displayName || 'Anonymous User'}</CardTitle>
+              <CardDescription className="text-sm sm:text-md text-muted-foreground mt-1">{user?.email}</CardDescription>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-2">{userJoinedDate}</p>
             </div>
-            <div className="flex flex-col sm:items-end gap-2 mt-4 sm:mt-0">
+            <div className="flex flex-col items-stretch sm:items-end gap-2 mt-4 sm:mt-0 w-full sm:w-auto">
                <Button variant="outline" className="w-full sm:w-auto" disabled>
                  <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
                </Button>
@@ -144,8 +144,8 @@ export default function ProfilePage() {
 
       <div>
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-semibold text-foreground flex items-center">
-            <Bookmark className="mr-3 h-7 w-7 text-primary" />
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground flex items-center">
+            <Bookmark className="mr-3 h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             My Saved Recipes
             </h2>
         </div>
@@ -167,22 +167,23 @@ export default function ProfilePage() {
         ) : savedRecipes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {savedRecipes.map(recipe => (
-              <RecipeCard 
-                key={recipe.id} 
+              <RecipeCard
+                key={recipe.id}
                 id={recipe.id}
                 title={recipe.title}
                 imageUrl={recipe.imageUrl || "https://picsum.photos/200/300"}
                 cookTime={recipe.cookTime}
                 dataAiHint="saved recipe food"
+                // onDelete={() => handleDeleteRecipe(recipe.id)} // This prop is not on RecipeCard
               />
             ))}
           </div>
         ) : (
           <Card className="border-dashed border-border">
-            <CardContent className="p-10 text-center">
-              <Bookmark className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-xl font-medium text-foreground">No Saved Recipes Yet</p>
-              <p className="text-muted-foreground mt-1">
+            <CardContent className="p-6 sm:p-10 text-center">
+              <Bookmark className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
+              <p className="text-lg sm:text-xl font-medium text-foreground">No Saved Recipes Yet</p>
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                 Start exploring and save your favorite culinary creations!
               </p>
               <Button asChild className="mt-6 bg-accent text-accent-foreground hover:bg-accent/90">
