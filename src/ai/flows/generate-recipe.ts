@@ -2,7 +2,7 @@
 'use server'
 
 /**
- * @fileOverview Recipe generation flow from a list of ingredients.
+ * @fileOverview Recipe generation flow from a list of ingredients, mood, and dietary preference.
  *
  * - generateRecipe - A function that handles the recipe generation process.
  * - GenerateRecipeInput - The input type for the generateRecipe function.
@@ -16,6 +16,8 @@ const GenerateRecipeInputSchema = z.object({
   ingredients: z.array(
     z.string().describe('A list of ingredients available to use in the recipe.')
   ).describe('The ingredients to generate a recipe from.'),
+  mood: z.string().optional().describe('The user\'s current mood to tailor the recipe. E.g., Happy, Comforting, Energetic, Quick & Easy.'),
+  dietaryPreference: z.enum(['Veg', 'Non-Veg', 'Any']).default('Any').optional().describe('The dietary preference for the recipe: Veg, Non-Veg, or Any.'),
 });
 export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
 
@@ -37,16 +39,31 @@ const recipePrompt = ai.definePrompt({
   input: {schema: GenerateRecipeInputSchema},
   output: {schema: GenerateRecipeOutputSchema.omit({ imageUrl: true })}, // LLM won't generate imageUrl
   prompt: `You are a world-class chef, skilled at creating delicious recipes from a provided list of ingredients.
+  The user is also providing their current mood and dietary preference.
 
-  I will provide you a list of ingredients, and you will respond with a complete recipe, including:
+  I will provide you a list of ingredients, a mood, and a dietary preference. You will respond with a complete recipe, including:
   - A creative and descriptive title for the recipe.
   - Clear, step-by-step cooking instructions.
   - An estimated cook time.
   - Nutritional information.
 
-  Do NOT suggest an image or image prompt.
-
   Ingredients: {{ingredients}}
+  {{#if mood}}
+  Mood: {{mood}}. Please generate a recipe that fits this mood.
+  {{/if}}
+  {{#if dietaryPreference}}
+  Dietary Preference: {{dietaryPreference}}.
+  {{#if (eq dietaryPreference "Veg")}}
+  The recipe MUST be strictly vegetarian. Do not include any meat, poultry, or fish.
+  {{else if (eq dietaryPreference "Non-Veg")}}
+  The recipe can include meat, poultry, or fish.
+  {{else}}
+  There are no specific dietary restrictions beyond the ingredients provided.
+  {{/if}}
+  {{/if}}
+
+  Do NOT suggest an image or image prompt.
+  Ensure the recipe aligns with the provided mood (if any) and dietary preference.
   `,
 });
 
@@ -70,3 +87,8 @@ const generateRecipeFlow = ai.defineFlow(
   }
 );
 
+// Helper for Handlebars 'eq'
+import Handlebars from 'handlebars';
+Handlebars.registerHelper('eq', function (a, b) {
+  return a === b;
+});
