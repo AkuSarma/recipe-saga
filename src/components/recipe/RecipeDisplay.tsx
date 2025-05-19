@@ -50,7 +50,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       }
     };
     checkSavedStatus();
-  }, [user, recipe.title, recipe.cookTime, isSavedRecipe]);
+  }, [user, recipe.title, recipe.cookTime, recipe.instructions, recipe.nutritionalInformation, isSavedRecipe]); // Added more dependencies for better check
 
 
   const handleSaveRecipe = async () => {
@@ -79,12 +79,12 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     try {
       const batch = writeBatch(db);
 
-      const recipeDataToSave: Omit<GenerateRecipeOutput, 'imageUrl'> & { imageUrl: string; userId?: string; savedAt?: any; authorId?: string; authorDisplayName?: string; originalImageUrl?: string } = {
-        title: recipe.title,
-        instructions: recipe.instructions,
-        cookTime: recipe.cookTime,
-        nutritionalInformation: recipe.nutritionalInformation,
-        imageUrl: recipe.imageUrl, // This will be "https://picsum.photos/200/300"
+      const recipeDataToSave = {
+        title: recipe.title || "Unnamed Recipe",
+        instructions: recipe.instructions || "No instructions provided.",
+        cookTime: recipe.cookTime || "N/A",
+        nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
+        imageUrl: recipe.imageUrl || "https://picsum.photos/200/300", 
       };
       
       console.log('[RecipeDisplay] handleSaveRecipe: Base recipe data for save:', JSON.stringify(recipeDataToSave));
@@ -103,17 +103,13 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       // 2. Save to public collection for Explore page
       const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
       const recipeDataForPublic = {
-        title: recipe.title || "Unnamed Recipe",
+        ...recipeDataToSave, // Now includes instructions and nutritionalInformation
         savedAt: serverTimestamp(),
         authorId: user.uid,
         authorDisplayName: user.displayName || "Community Chef",
-        cookTime: recipe.cookTime || "N/A",
-        imageUrl: recipe.imageUrl, // This will be "https://picsum.photos/200/300"
-        // Optionally include other fields like nutritionalInformation if desired for public view, but keep it concise.
-        // instructions can be omitted or truncated for public explore view to save space / simplify.
       };
 
-      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (simplified):', JSON.stringify(recipeDataForPublic));
+      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (full):', JSON.stringify(recipeDataForPublic));
       batch.set(publicRecipeRef, recipeDataForPublic);
 
       console.log('[RecipeDisplay] handleSaveRecipe: Attempting batch.commit() with user and public data.');
@@ -144,8 +140,13 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     }
     setIsDeleting(true);
     try {
+      // For now, only delete from user's private collection.
+      // Deleting from publicExploreRecipes if it was an unsave action from a recipe that the user originally shared
+      // would require knowing the ID of the public document, which might differ from the user's private document ID.
+      // This could be enhanced later if needed.
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
       console.log(`[RecipeDisplay] handleDeleteRecipe: Successfully deleted/unsaved from user's private collection.`);
+      
       toast({
         title: isUnsaveAction ? "Recipe Unsaved" : "Recipe Deleted",
         description: `${recipe.title} has been removed from your collection.`,
