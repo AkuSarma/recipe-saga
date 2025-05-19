@@ -3,9 +3,10 @@ import type {Metadata} from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer'; // Import Footer
+import { Footer } from '@/components/layout/Footer';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
+import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -18,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'MoodMunch', // Updated title
-  description: 'Discover recipes that match your mood with MoodMunch!', // Updated description
+  title: 'MoodMunch', 
+  description: 'Discover recipes that match your mood with MoodMunch!',
 };
 
 export default function RootLayout({
@@ -33,14 +34,21 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen bg-background`}
         suppressHydrationWarning={true}
       >
-        <AuthProvider>
-          <Header />
-          <main className="flex-grow container mx-auto px-4 py-8">
-            {children}
-          </main>
-          <Footer /> {/* Add Footer here */}
-          <Toaster />
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <Header />
+            <main className="flex-grow container mx-auto px-4 py-8">
+              {children}
+            </main>
+            <Footer /> 
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

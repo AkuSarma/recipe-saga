@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from './ThemeToggle'; // Import ThemeToggle
 import { useState, useEffect } from 'react';
 
 export function Header() {
@@ -48,7 +49,8 @@ export function Header() {
             </Link>
           )}
         </nav>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2"> {/* Reduced space for tighter packing */}
+          <ThemeToggle /> {/* Add ThemeToggle button */}
           {loading || !isClient ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : user ? (
