@@ -77,6 +77,7 @@ const recipePrompt = ai.definePrompt({
     {{/if}}
   {{/if}}
 
+  Ensure that the recipe is Indian household friendly, that is try to use microwave and oven as less as possible and use gas stove instead for cooking.
   Do NOT suggest an image or image prompt.
   Ensure the recipe aligns with the provided mood (if any) and dietary preference.
   `,
