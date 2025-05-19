@@ -25,9 +25,11 @@ interface RecipeFormProps {
 const moods = ["Happy", "Comforting", "Energetic", "Quick & Easy", "Adventurous", "Calm"];
 type DietaryPreference = "Veg" | "Non-Veg" | "Any";
 
+const NO_MOOD_SENTINEL_VALUE = "__NO_MOOD_SELECTED__"; // Unique value for the "None" SelectItem
+
 export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormProps) {
   const [ingredients, setIngredients] = useState<string[]>([]);
-  const [selectedMood, setSelectedMood] = useState<string>("");
+  const [selectedMood, setSelectedMood] = useState<string>(""); // Empty string means placeholder / no mood
   const [dietaryPreference, setDietaryPreference] = useState<DietaryPreference>("Any");
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
     try {
       const result = await handleGenerateRecipe(
         ingredients,
-        selectedMood || undefined, // Send undefined if no mood selected
+        selectedMood || undefined, // Send undefined if selectedMood is ""
         dietaryPreference
       );
       if ('error' in result) {
@@ -79,12 +81,21 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
 
           <div className="space-y-2">
             <Label htmlFor="mood-select">What's your mood?</Label>
-            <Select value={selectedMood} onValueChange={setSelectedMood}>
+            <Select 
+              value={selectedMood} 
+              onValueChange={(value) => {
+                if (value === NO_MOOD_SENTINEL_VALUE) {
+                  setSelectedMood(""); // Set internal state to "" for "no mood"
+                } else {
+                  setSelectedMood(value);
+                }
+              }}
+            >
               <SelectTrigger id="mood-select" className="w-full">
                 <SelectValue placeholder="Select a mood (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Surprise Me!)</SelectItem>
+                <SelectItem value={NO_MOOD_SENTINEL_VALUE}>None (Surprise Me!)</SelectItem>
                 {moods.map(mood => (
                   <SelectItem key={mood} value={mood}>{mood}</SelectItem>
                 ))}
