@@ -21,6 +21,16 @@ const GenerateRecipeInputSchema = z.object({
 });
 export type GenerateRecipeInput = z.infer<typeof GenerateRecipeInputSchema>;
 
+// Internal schema for the prompt, including boolean flags for dietary preferences
+const InternalPromptInputSchema = GenerateRecipeInputSchema.extend({
+  isVeg: z.boolean().optional(),
+  isNonVeg: z.boolean().optional(),
+  isVegan: z.boolean().optional(),
+  isAnyDiet: z.boolean().optional(), // Represents 'Any' or unspecified
+});
+type InternalPromptInput = z.infer<typeof InternalPromptInputSchema>;
+
+
 const GenerateRecipeOutputSchema = z.object({
   title: z.string().describe('The title of the recipe.'),
   instructions: z.string().describe('Step by step cooking instructions for the recipe.'),
@@ -36,8 +46,8 @@ export async function generateRecipe(input: GenerateRecipeInput): Promise<Genera
 
 const recipePrompt = ai.definePrompt({
   name: 'recipePrompt',
-  input: {schema: GenerateRecipeInputSchema},
-  output: {schema: GenerateRecipeOutputSchema.omit({ imageUrl: true })}, // LLM won't generate imageUrl
+  input: {schema: InternalPromptInputSchema}, // Use the internal schema
+  output: {schema: GenerateRecipeOutputSchema.omit({ imageUrl: true })},
   prompt: `You are a world-class chef, skilled at creating delicious recipes from a provided list of ingredients.
   The user is also providing their current mood and dietary preference.
 
@@ -51,17 +61,20 @@ const recipePrompt = ai.definePrompt({
   {{#if mood}}
   Mood: {{mood}}. Please generate a recipe that fits this mood.
   {{/if}}
-  {{#if dietaryPreference}}
+
   Dietary Preference: {{dietaryPreference}}.
-  {{#if (eq dietaryPreference "Veg")}}
+  {{#if isVeg}}
   The recipe MUST be strictly vegetarian. Do not include any meat, poultry, or fish. It can include dairy and eggs.
-  {{else if (eq dietaryPreference "Non-Veg")}}
-  The recipe can include meat, poultry, or fish.
-  {{else if (eq dietaryPreference "Vegan")}}
-  The recipe MUST be strictly vegan. Do not include any meat, poultry, fish, dairy products (milk, cheese, butter, yogurt), eggs, or honey.
   {{else}}
-  There are no specific dietary restrictions beyond the ingredients provided.
-  {{/if}}
+    {{#if isNonVeg}}
+    The recipe can include meat, poultry, or fish.
+    {{else}}
+      {{#if isVegan}}
+      The recipe MUST be strictly vegan. Do not include any meat, poultry, fish, dairy products (milk, cheese, butter, yogurt), eggs, or honey.
+      {{else}} {{! This covers isAnyDiet (i.e., dietaryPreference was 'Any') }}
+      There are no specific dietary restrictions.
+      {{/if}}
+    {{/if}}
   {{/if}}
 
   Do NOT suggest an image or image prompt.
@@ -72,11 +85,21 @@ const recipePrompt = ai.definePrompt({
 const generateRecipeFlow = ai.defineFlow(
   {
     name: 'generateRecipeFlow',
-    inputSchema: GenerateRecipeInputSchema,
+    inputSchema: GenerateRecipeInputSchema, // External input schema remains the same
     outputSchema: GenerateRecipeOutputSchema,
   },
-  async input => {
-    const recipeDetails = await recipePrompt(input);
+  async (input: GenerateRecipeInput) => {
+    // Transform GenerateRecipeInput to InternalPromptInput
+    const dp = input.dietaryPreference; // Due to .default('Any'), dp will always be one of the enum values.
+    const internalPromptInput: InternalPromptInput = {
+      ...input,
+      isVeg: dp === 'Veg',
+      isNonVeg: dp === 'Non-Veg',
+      isVegan: dp === 'Vegan',
+      isAnyDiet: dp === 'Any',
+    };
+    
+    const recipeDetails = await recipePrompt(internalPromptInput);
     
     if (!recipeDetails.output) {
       throw new Error("Failed to generate recipe details from LLM.");
@@ -89,9 +112,4 @@ const generateRecipeFlow = ai.defineFlow(
   }
 );
 
-// Helper for Handlebars 'eq'
-import Handlebars from 'handlebars';
-Handlebars.registerHelper('eq', function (a, b) {
-  return a === b;
-});
-
+// Removed Handlebars import and registerHelper as 'eq' is no longer used.
