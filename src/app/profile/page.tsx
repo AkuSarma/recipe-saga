@@ -21,6 +21,7 @@ interface FirebaseSavedRecipe extends GenerateRecipeOutput {
   id: string;
   savedAt: Timestamp;
   userId: string;
+  likeCount?: number; // Added for like count
 }
 
 function SavedRecipeCardSkeleton() {
@@ -173,8 +174,10 @@ export default function ProfilePage() {
                 title={recipe.title}
                 imageUrl={recipe.imageUrl || "https://picsum.photos/200/300"}
                 cookTime={recipe.cookTime}
+                likes={recipe.likeCount || 0} // Pass the likeCount
                 dataAiHint="saved recipe food"
-                // onDelete={() => handleDeleteRecipe(recipe.id)} // This prop is not on RecipeCard
+                // onDelete prop is not available on RecipeCard, but we have handleDeleteRecipe for this page
+                // If a delete button is needed *on the card itself*, RecipeCard would need an onDelete prop
               />
             ))}
           </div>
@@ -196,3 +199,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+

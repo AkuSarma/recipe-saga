@@ -36,8 +36,6 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         const q = query(
           collection(db, "users", user.uid, "savedRecipes"),
           where("title", "==", recipe.title),
-          // Consider adding more fields to where clause if title alone isn't unique enough
-          // e.g., where("cookTime", "==", recipe.cookTime)
         );
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -49,7 +47,6 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         }
       } catch (error) {
         console.error("[RecipeDisplay] Error checking saved status:", error);
-        // Optionally, show a toast for this error
       }
     };
     checkSavedStatus();
@@ -87,39 +84,39 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         instructions: recipe.instructions || "No instructions provided.",
         cookTime: recipe.cookTime || "N/A",
         nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
-        // imageUrl will be handled based on whether it's a data URI or a regular URL
         imageUrl: recipe.imageUrl && recipe.imageUrl.startsWith('data:image') ? "https://picsum.photos/200/300" : recipe.imageUrl || "https://picsum.photos/200/300",
       };
       
       console.log('[RecipeDisplay] handleSaveRecipe: Base recipe data for save:', JSON.stringify(recipeDataToSave));
-
-      // 1. Save to user's private collection
+      
+      // 2. Prepare data for public collection
+      const recipeDataForPublic = {
+        ...recipeDataToSave, // Use the same base data
+        instructions: recipe.instructions || "No instructions provided.",
+        nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
+        savedAt: serverTimestamp(),
+        authorId: user.uid,
+        authorDisplayName: user.displayName || "Community Chef",
+        likeCount: 0, // Initialize likeCount for new public recipes
+      };
+      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (full):', JSON.stringify(recipeDataForPublic));
+      
+      // 1. Prepare data for user's private collection
+      // Include likeCount from the public version (which is 0 if new)
       const userRecipeRef = doc(collection(db, 'users', user.uid, 'savedRecipes'));
       const recipeDataToSaveForUser = {
         ...recipeDataToSave,
         userId: user.uid,
         savedAt: serverTimestamp(),
+        likeCount: recipeDataForPublic.likeCount, // Snapshot of public likeCount
       };
-      
       console.log('[RecipeDisplay] handleSaveRecipe: Data for user save:', JSON.stringify(recipeDataToSaveForUser));
       batch.set(userRecipeRef, recipeDataToSaveForUser);
       
-      // 2. Save to public collection for Explore page
+      // Set public recipe (this will either create new or overwrite if ID matched, but we generate new ID here)
       const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
-      const recipeDataForPublic = {
-        title: recipe.title || "Unnamed Recipe",
-        instructions: recipe.instructions || "No instructions provided.", // Now included
-        cookTime: recipe.cookTime || "N/A",
-        nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.", // Now included
-        imageUrl: recipe.imageUrl && recipe.imageUrl.startsWith('data:image') ? "https://picsum.photos/200/300" : recipe.imageUrl || "https://picsum.photos/200/300",
-        savedAt: serverTimestamp(),
-        authorId: user.uid,
-        authorDisplayName: user.displayName || "Community Chef",
-        likeCount: 0, // Initialize likeCount
-      };
-
-      console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (full):', JSON.stringify(recipeDataForPublic));
       batch.set(publicRecipeRef, recipeDataForPublic);
+
 
       console.log('[RecipeDisplay] handleSaveRecipe: Attempting batch.commit() with user and public data.');
       await batch.commit();
@@ -143,7 +140,13 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
   const handleDeleteRecipe = async (recipeIdToDelete: string, isUnsaveAction: boolean = false) => {
     console.log(`[RecipeDisplay] handleDeleteRecipe: Called for ID ${recipeIdToDelete}. Is unsave: ${isUnsaveAction}`);
     if (!user || !recipeIdToDelete || !db) {
-      if (!db) toast({ title: 'Database Error', description: 'Firestore is not available.', variant: 'destructive' });
+      if (!db) {
+          toast({ title: 'Database Error', description: 'Firestore is not available.', variant: 'destructive' });
+      } else if (!user) {
+          toast({ title: 'Authentication Error', description: 'You must be logged in to delete recipes.', variant: 'destructive' });
+      } else {
+          toast({ title: 'Error', description: 'Recipe ID is missing.', variant: 'destructive' });
+      }
       console.log('[RecipeDisplay] handleDeleteRecipe: User, recipeId, or db missing.');
       return;
     }
@@ -152,10 +155,6 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
       console.log(`[RecipeDisplay] handleDeleteRecipe: Successfully deleted/unsaved from user's private collection.`);
       
-      // Note: Deleting from publicExploreRecipes when a user unsaves is complex
-      // if multiple users could have effectively "saved" the same public recipe.
-      // For now, we only remove from the user's private list.
-
       toast({
         title: isUnsaveAction ? "Recipe Unsaved" : "Recipe Deleted",
         description: `${recipe.title} has been removed from your collection.`,
