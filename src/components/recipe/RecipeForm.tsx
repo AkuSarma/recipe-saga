@@ -171,10 +171,11 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
             {recognitionError && <p className="text-sm text-destructive text-center mt-2">{recognitionError}</p>}
           </div>
           
-          <div className="flex items-center text-muted-foreground">
-            <Separator className="flex-grow" />
-            <span className="px-3 text-sm">OR</span>
-            <Separator className="flex-grow" />
+
+          <div className="w-full max-w-full overflow-hidden flex items-center text-muted-foreground">
+            <div className="flex-grow h-px bg-border" />
+            <span className="px-3 text-sm whitespace-nowrap">OR</span>
+            <div className="flex-grow h-px bg-border" />
           </div>
 
           <IngredientInput ingredients={ingredients} setIngredients={setIngredients} />
