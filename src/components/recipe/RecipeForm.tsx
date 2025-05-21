@@ -171,8 +171,10 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
             {recognitionError && <p className="text-sm text-destructive text-center mt-2">{recognitionError}</p>}
           </div>
           
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Separator className="flex-grow" /> OR <Separator className="flex-grow" />
+          <div className="flex items-center text-muted-foreground">
+            <Separator className="flex-grow" />
+            <span className="px-3 text-sm">OR</span>
+            <Separator className="flex-grow" />
           </div>
 
           <IngredientInput ingredients={ingredients} setIngredients={setIngredients} />
@@ -218,7 +220,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="Non-Veg" id="diet-nonveg" />
-                <Label htmlFor="diet-nonveg" className="font-normal">Non-Vegetarian</Label>
+                <Label htmlFor="nonveg" className="font-normal">Non-Vegetarian</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="Vegan" id="diet-vegan" />
