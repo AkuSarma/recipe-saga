@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase/config';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -20,13 +20,23 @@ export default function AuthPage() {
   const [displayName, setDisplayName] = useState(''); // For sign-up
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  const getRedirectUrl = () => {
+    const redirect = searchParams.get('redirect');
+    // Basic validation: ensure it's a relative path within the app
+    if (redirect && redirect.startsWith('/')) {
+      return redirect;
+    }
+    return '/'; // Default redirect to generate page
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      if (!auth || !db) { // Check if Firebase services are initialized
+      if (!auth || !db) {
         toast({ title: 'Initialization Error', description: 'Firebase services are not ready. Please try again later.', variant: 'destructive' });
         setIsLoading(false);
         return;
@@ -42,7 +52,7 @@ export default function AuthPage() {
         });
       }
       toast({ title: 'Account Created!', description: 'You have successfully signed up.' });
-      router.push('/profile');
+      router.push(getRedirectUrl());
     } catch (error: any) {
       toast({ title: 'Sign Up Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -54,14 +64,14 @@ export default function AuthPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      if (!auth) { // Check if Firebase auth is initialized
+      if (!auth) {
         toast({ title: 'Initialization Error', description: 'Firebase auth is not ready. Please try again later.', variant: 'destructive' });
         setIsLoading(false);
         return;
       }
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: 'Login Successful!', description: 'Welcome back!' });
-      router.push('/profile');
+      router.push(getRedirectUrl());
     } catch (error: any) {
       toast({ title: 'Login Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -80,7 +90,7 @@ export default function AuthPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl sm:text-2xl">Login</CardTitle>
-              <CardDescription className="text-sm sm:text-base">Access your account to view your saved recipes.</CardDescription>
+              <CardDescription className="text-sm sm:text-base">Access your account to generate and explore recipes.</CardDescription>
             </CardHeader>
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-4">
@@ -106,7 +116,7 @@ export default function AuthPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-xl sm:text-2xl">Sign Up</CardTitle>
-              <CardDescription className="text-sm sm:text-base">Create an account to start saving your favorite recipes.</CardDescription>
+              <CardDescription className="text-sm sm:text-base">Create an account to start generating and exploring recipes.</CardDescription>
             </CardHeader>
             <form onSubmit={handleSignUp}>
               <CardContent className="space-y-4">
