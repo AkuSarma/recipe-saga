@@ -1,13 +1,15 @@
 
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 import { RecipeForm } from '@/components/recipe/RecipeForm';
 import { RecipeDisplay } from '@/components/recipe/RecipeDisplay';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Sparkles } from 'lucide-react'; 
+import { AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 function RecipeDisplaySkeleton() {
   return (
@@ -45,11 +47,20 @@ function RecipeDisplaySkeleton() {
 
 export default function HomePage() {
   const [generatedRecipe, setGeneratedRecipe] = useState<GenerateRecipeOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/auth?redirect=/');
+    }
+  }, [user, authLoading, router]);
+
   const handleRecipeGenerated = (recipe: GenerateRecipeOutput | null, errorMsg?: string) => {
-    setIsLoading(false);
+    setIsLoadingRecipe(false);
     if (errorMsg) {
       setError(errorMsg);
       setGeneratedRecipe(null);
@@ -60,33 +71,41 @@ export default function HomePage() {
   };
 
   const handleFormSubmissionStart = () => {
-    setIsLoading(true);
+    setIsLoadingRecipe(true);
     setError(null);
     setGeneratedRecipe(null);
   };
 
+  if (authLoading || (!user && !authLoading)) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10">
-      <RecipeForm 
-        onRecipeGenerated={handleRecipeGenerated} 
-        onSubmissionStart={handleFormSubmissionStart} 
+      <RecipeForm
+        onRecipeGenerated={handleRecipeGenerated}
+        onSubmissionStart={handleFormSubmissionStart}
       />
-      
-      {isLoading && (
+
+      {isLoadingRecipe && (
         <>
           <Separator className="my-8" />
           <RecipeDisplaySkeleton />
         </>
       )}
 
-      {!isLoading && generatedRecipe && (
+      {!isLoadingRecipe && generatedRecipe && (
         <>
           <Separator className="my-8" />
           <RecipeDisplay recipe={generatedRecipe} />
         </>
       )}
 
-      {!isLoading && error && !generatedRecipe && (
+      {!isLoadingRecipe && error && !generatedRecipe && (
          <>
           <Separator className="my-8" />
           <Card className="w-full max-w-3xl mx-auto border-destructive bg-destructive/10">
@@ -99,7 +118,7 @@ export default function HomePage() {
         </>
       )}
 
-      {!isLoading && !generatedRecipe && !error && (
+      {!isLoadingRecipe && !generatedRecipe && !error && (
          <div className="text-center py-10 text-muted-foreground">
             <Sparkles className="mx-auto h-12 w-12 mb-4 text-primary/70" />
             <p className="text-lg">Ready to discover your next favorite dish?</p>

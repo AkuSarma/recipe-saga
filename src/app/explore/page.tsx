@@ -9,6 +9,8 @@ import { db } from '@/lib/firebase/config';
 import { collection, query, getDocs, limit, type Timestamp, orderBy } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 import Image from 'next/image';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface PublicRecipe extends Omit<GenerateRecipeOutput, 'nutritionalInformation'> {
   savedAt: Timestamp;
@@ -41,65 +43,82 @@ function RecipeCardSkeleton() {
 export default function ExplorePage() {
   const [recipes, setRecipes] = useState<RecipeCardProps[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   useEffect(() => {
-    const fetchPublicRecipes = async () => {
-      if (!db) {
-        setError("Database not initialized. Please try again later.");
-        setIsLoading(false);
-        toast({title: "Error", description: "Could not connect to the database.", variant: "destructive"});
-        return;
-      }
-      setIsLoading(true);
-      setError(null);
-      try {
-        console.log("Fetching from publicExploreRecipes...");
-        const q = query(
-          collection(db, "publicExploreRecipes"),
-          orderBy("savedAt", "desc"),
-          limit(24)
-        );
-        const querySnapshot = await getDocs(q);
-        console.log("Query snapshot empty:", querySnapshot.empty);
-        console.log("Number of docs fetched:", querySnapshot.docs.length);
+    if (!authLoading && !user) {
+      router.replace('/auth?redirect=/explore');
+    }
+  }, [user, authLoading, router]);
 
-        const fetchedRecipes = querySnapshot.docs.map(doc => {
-          const data = doc.data() as PublicRecipe;
-          const recipeCardData: RecipeCardProps = {
-            id: doc.id,
-            title: data.title,
-            imageUrl: data.imageUrl || "https://picsum.photos/200/300",
-            cookTime: data.cookTime,
-            author: data.authorDisplayName || "Community Chef",
-            likes: Math.floor(Math.random() * 100), // Likes are currently mock for explore
-            dataAiHint: 'food recipe'
-          };
-          if (querySnapshot.docs.length > 0 && doc.id === querySnapshot.docs[0].id) {
-             console.log("First doc data from Firestore:", data);
-             console.log("Mapped first recipe card data:", recipeCardData);
-          }
-          return recipeCardData;
-        });
-        setRecipes(fetchedRecipes);
-      } catch (err: any) {
-        console.error("Error fetching public recipes:", err);
-        if (err.code === 'failed-precondition') {
-             setError("Query requires an index. Please check Firestore console for index creation link or create manually: Collection 'publicExploreRecipes', Field 'savedAt', Order 'Descending'.");
-             toast({ title: "Indexing Required", description: "A database index is needed to show recipes. Check console.", variant: "destructive", duration: 10000 });
-        } else {
-            setError(err.message || "Failed to load recipes for exploration.");
-            toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
+  useEffect(() => {
+    if (user) { // Only fetch if user is authenticated
+      const fetchPublicRecipes = async () => {
+        if (!db) {
+          setError("Database not initialized. Please try again later.");
+          setIsLoadingRecipes(false);
+          toast({title: "Error", description: "Could not connect to the database.", variant: "destructive"});
+          return;
         }
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        setIsLoadingRecipes(true);
+        setError(null);
+        try {
+          console.log("Fetching from publicExploreRecipes...");
+          const q = query(
+            collection(db, "publicExploreRecipes"),
+            orderBy("savedAt", "desc"),
+            limit(24)
+          );
+          const querySnapshot = await getDocs(q);
+          console.log("Query snapshot empty:", querySnapshot.empty);
+          console.log("Number of docs fetched:", querySnapshot.docs.length);
 
-    fetchPublicRecipes();
-  }, [toast]);
+          const fetchedRecipes = querySnapshot.docs.map(doc => {
+            const data = doc.data() as PublicRecipe;
+            const recipeCardData: RecipeCardProps = {
+              id: doc.id,
+              title: data.title,
+              imageUrl: data.imageUrl || "https://picsum.photos/200/300",
+              cookTime: data.cookTime,
+              author: data.authorDisplayName || "Community Chef",
+              likes: Math.floor(Math.random() * 100), // Likes are currently mock for explore
+              dataAiHint: 'food recipe'
+            };
+            if (querySnapshot.docs.length > 0 && doc.id === querySnapshot.docs[0].id) {
+               console.log("First doc data from Firestore:", data);
+               console.log("Mapped first recipe card data:", recipeCardData);
+            }
+            return recipeCardData;
+          });
+          setRecipes(fetchedRecipes);
+        } catch (err: any) {
+          console.error("Error fetching public recipes:", err);
+          if (err.code === 'failed-precondition') {
+               setError("Query requires an index. Please check Firestore console for index creation link or create manually: Collection 'publicExploreRecipes', Field 'savedAt', Order 'Descending'.");
+               toast({ title: "Indexing Required", description: "A database index is needed to show recipes. Check console.", variant: "destructive", duration: 10000 });
+          } else if (err.code === 'permission-denied') {
+              setError("You don't have permission to view these recipes. Please ensure you are logged in and have the correct Firestore rules configured.");
+              toast({ title: "Permission Denied", description: "Could not fetch community recipes due to permissions.", variant: "destructive" });
+          }
+          else {
+              setError(err.message || "Failed to load recipes for exploration.");
+              toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
+          }
+        } finally {
+          setIsLoadingRecipes(false);
+        }
+      };
+      fetchPublicRecipes();
+    } else if (!authLoading && !user) {
+      // If not loading and no user, we've already redirected, but good to stop recipe loading.
+      setIsLoadingRecipes(false);
+    }
+  }, [user, authLoading, toast]);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -110,6 +129,15 @@ export default function ExplorePage() {
     toast({ title: "Liked!", description: `You liked recipe ${id}. (Demo)` });
     setRecipes(prevRecipes => prevRecipes.map(r => r.id === id ? {...r, likes: (r.likes || 0) + 1} : r));
   };
+
+
+  if (authLoading || (!user && !authLoading)) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -132,7 +160,7 @@ export default function ExplorePage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isLoadingRecipes ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">
           {[...Array(6)].map((_, index) => <RecipeCardSkeleton key={index} />)}
         </div>
