@@ -4,9 +4,10 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from "next-themes";
+import { ToastContainer, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -19,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'MoodMunch', 
+  title: 'MoodMunch',
   description: 'Discover recipes that match your mood with MoodMunch!',
 };
 
@@ -45,8 +46,20 @@ export default function RootLayout({
             <main className="flex-grow container mx-auto px-4 py-8">
               {children}
             </main>
-            <Footer /> 
-            <Toaster />
+            <Footer />
+            <ToastContainer
+              position="top-right"
+              autoClose={5000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick={false}
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+              transition={Bounce}
+            />
           </AuthProvider>
         </ThemeProvider>
       </body>

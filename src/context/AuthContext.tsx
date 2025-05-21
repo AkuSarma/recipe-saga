@@ -5,9 +5,9 @@ import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth as firebaseAuthInstance } from '@/lib/firebase/config'; // Renamed to avoid conflict
+import { auth as firebaseAuthInstance } from '@/lib/firebase/config';
 import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
+import { toast, Bounce } from 'react-toastify';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -21,13 +21,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if firebaseAuthInstance is initialized
     if (!firebaseAuthInstance) {
       console.error("Firebase auth is not initialized. Cannot set up onAuthStateChanged listener.");
-      setLoading(false); // Stop loading, user will remain null
+      setLoading(false);
       return;
     }
 
@@ -35,23 +33,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(currentUser);
       setLoading(false);
     });
-    
-    // Cleanup subscription on unmount
+
     return () => unsubscribe();
-  }, []); // Empty dependency array: runs once on mount and cleans up on unmount
+  }, []);
 
   const logout = async () => {
     if (!firebaseAuthInstance) {
-      toast({ title: 'Logout Failed', description: 'Firebase not initialized.', variant: 'destructive' });
+      toast.error('Logout Failed: Firebase not initialized.', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       return;
     }
     try {
       await firebaseSignOut(firebaseAuthInstance);
-      toast({ title: 'Logged out successfully.' });
-      router.push('/'); // Redirect to home page after logout
+      toast.success('Logged out successfully.', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
+      router.push('/');
     } catch (error) {
       console.error("Error logging out:", error);
-      toast({ title: 'Logout Failed', description: (error as Error).message, variant: 'destructive' });
+      toast.error(`Logout Failed: ${(error as Error).message}`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     }
   };
 

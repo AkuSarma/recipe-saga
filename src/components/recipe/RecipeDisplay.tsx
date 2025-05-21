@@ -5,22 +5,27 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Clock, Flame, Heart, BookOpenText, Info, Loader2, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast, Bounce } from 'react-toastify';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase/config'; 
+import { db } from '@/lib/firebase/config';
 import { collection, query, where, getDocs, serverTimestamp, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 
 
-interface RecipeDisplayProps {
-  recipe: GenerateRecipeOutput & { id?: string }; 
-  isSavedRecipe?: boolean; 
-  onDelete?: (recipeId: string) => void; 
+interface DisplayableRecipe extends GenerateRecipeOutput {
+  id?: string; // id is present for saved recipes
+  imageDataUri?: string; // For newly generated, unsaved images
 }
 
+interface RecipeDisplayProps {
+  recipe: DisplayableRecipe;
+  isSavedRecipe?: boolean;
+  onDelete?: (recipeId: string) => void;
+}
+
+
 export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: RecipeDisplayProps) {
-  const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -29,7 +34,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
 
   useEffect(() => {
-    if (isSavedRecipe || !user || !recipe.title || !db) return; 
+    if (isSavedRecipe || !user || !recipe.title || !db) return;
 
     const checkSavedStatus = async () => {
       try {
@@ -50,27 +55,31 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       }
     };
     checkSavedStatus();
-  }, [user, recipe.title, recipe.cookTime, recipe.instructions, recipe.nutritionalInformation, isSavedRecipe]);
+  }, [user, recipe.title, recipe.cookTime, recipe.instructions, recipe.nutritionalInformation, isSavedRecipe, recipe.imageUrl]);
 
 
   const handleSaveRecipe = async () => {
     console.log('[RecipeDisplay] handleSaveRecipe: Function called.');
     if (!user) {
-      toast({ title: 'Authentication Required', description: 'Please log in to save recipes.', variant: 'destructive' });
+      toast.error('Authentication Required: Please log in to save recipes.', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       console.log('[RecipeDisplay] handleSaveRecipe: User not authenticated.');
       return;
     }
     if (!db) {
-      toast({ title: 'Database Error', description: 'Firestore is not available. Please try again later.', variant: 'destructive' });
+      toast.error('Database Error: Firestore is not available. Please try again later.', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       console.log('[RecipeDisplay] handleSaveRecipe: Firestore (db) not available.');
       return;
     }
-    
+
     console.log('[RecipeDisplay] handleSaveRecipe: Initial state - AlreadySaved:', alreadySaved, 'SavedRecipeId:', savedRecipeId);
 
-    if (alreadySaved && savedRecipeId) { 
+    if (alreadySaved && savedRecipeId) {
       console.log('[RecipeDisplay] handleSaveRecipe: Recipe already saved by user, proceeding to unsave.');
-      await handleDeleteRecipe(savedRecipeId, true); 
+      await handleDeleteRecipe(savedRecipeId, true);
       return;
     }
 
@@ -84,36 +93,30 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         instructions: recipe.instructions || "No instructions provided.",
         cookTime: recipe.cookTime || "N/A",
         nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
-        imageUrl: recipe.imageUrl && recipe.imageUrl.startsWith('data:image') ? "https://picsum.photos/200/300" : recipe.imageUrl || "https://picsum.photos/200/300",
+        imageUrl: recipe.imageUrl || "https://picsum.photos/600/400", // Use existing imageUrl or placeholder
       };
-      
+
       console.log('[RecipeDisplay] handleSaveRecipe: Base recipe data for save:', JSON.stringify(recipeDataToSave));
-      
-      // 2. Prepare data for public collection
+
       const recipeDataForPublic = {
-        ...recipeDataToSave, // Use the same base data
-        instructions: recipe.instructions || "No instructions provided.",
-        nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
+        ...recipeDataToSave,
         savedAt: serverTimestamp(),
         authorId: user.uid,
         authorDisplayName: user.displayName || "Community Chef",
-        likeCount: 0, // Initialize likeCount for new public recipes
+        likeCount: 0,
       };
       console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (full):', JSON.stringify(recipeDataForPublic));
-      
-      // 1. Prepare data for user's private collection
-      // Include likeCount from the public version (which is 0 if new)
+
       const userRecipeRef = doc(collection(db, 'users', user.uid, 'savedRecipes'));
       const recipeDataToSaveForUser = {
         ...recipeDataToSave,
         userId: user.uid,
         savedAt: serverTimestamp(),
-        likeCount: recipeDataForPublic.likeCount, // Snapshot of public likeCount
+        likeCount: recipeDataForPublic.likeCount,
       };
       console.log('[RecipeDisplay] handleSaveRecipe: Data for user save:', JSON.stringify(recipeDataToSaveForUser));
       batch.set(userRecipeRef, recipeDataToSaveForUser);
-      
-      // Set public recipe (this will either create new or overwrite if ID matched, but we generate new ID here)
+
       const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
       batch.set(publicRecipeRef, recipeDataForPublic);
 
@@ -122,15 +125,16 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       await batch.commit();
       console.log('[RecipeDisplay] handleSaveRecipe: batch.commit() successful. UserRef ID:', userRecipeRef.id, 'PublicRef ID:', publicRecipeRef.id);
 
-      toast({
-        title: "Recipe Saved!",
-        description: `${recipe.title} has been saved to your collection and is now discoverable.`,
+      toast.success(`${recipe.title} has been saved to your collection and is now discoverable.`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
       });
       setAlreadySaved(true);
-      setSavedRecipeId(userRecipeRef.id); 
+      setSavedRecipeId(userRecipeRef.id);
     } catch (error: any) {
       console.error("[RecipeDisplay] Error saving recipe:", error);
-      toast({ title: 'Failed to Save', description: error.message || "Could not save recipe.", variant: 'destructive' });
+      toast.error(error.message || "Could not save recipe.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     } finally {
       setIsSaving(false);
       console.log('[RecipeDisplay] handleSaveRecipe: Finished save attempt.');
@@ -141,11 +145,17 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     console.log(`[RecipeDisplay] handleDeleteRecipe: Called for ID ${recipeIdToDelete}. Is unsave: ${isUnsaveAction}`);
     if (!user || !recipeIdToDelete || !db) {
       if (!db) {
-          toast({ title: 'Database Error', description: 'Firestore is not available.', variant: 'destructive' });
+          toast.error('Database Error: Firestore is not available.', {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
       } else if (!user) {
-          toast({ title: 'Authentication Error', description: 'You must be logged in to delete recipes.', variant: 'destructive' });
+          toast.error('Authentication Error: You must be logged in to delete recipes.', {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
       } else {
-          toast({ title: 'Error', description: 'Recipe ID is missing.', variant: 'destructive' });
+          toast.error('Error: Recipe ID is missing.', {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
       }
       console.log('[RecipeDisplay] handleDeleteRecipe: User, recipeId, or db missing.');
       return;
@@ -154,24 +164,21 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     try {
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
       console.log(`[RecipeDisplay] handleDeleteRecipe: Successfully deleted/unsaved from user's private collection.`);
-      
-      toast({
-        title: isUnsaveAction ? "Recipe Unsaved" : "Recipe Deleted",
-        description: `${recipe.title} has been removed from your collection.`,
-        variant: isUnsaveAction ? "default" : "destructive"
+
+      toast.success(`${recipe.title} has been removed from your collection.`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
       });
+
       if (onDelete && !isUnsaveAction) {
         onDelete(recipeIdToDelete);
       }
-      setAlreadySaved(false); 
+      setAlreadySaved(false);
       setSavedRecipeId(undefined);
 
-    } catch (error: any) { 
+    } catch (error: any) {
       console.error(`[RecipeDisplay] Error ${isUnsaveAction ? 'unsaving' : 'deleting'} recipe:`, error);
-      toast({
-        title: `Failed to ${isUnsaveAction ? 'Unsave' : 'Delete'}`,
-        description: error.message || `Could not ${isUnsaveAction ? 'unsave' : 'delete'} recipe.`,
-        variant: 'destructive'
+      toast.error(error.message || `Could not ${isUnsaveAction ? 'unsave' : 'delete'} recipe.`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
       });
     } finally {
       setIsDeleting(false);
@@ -179,19 +186,21 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     }
   };
 
+  const displayImageUrl = recipe.imageDataUri || recipe.imageUrl || "https://picsum.photos/600/400";
+
   return (
     <Card className="w-full max-w-3xl mx-auto shadow-xl overflow-hidden border-border">
       <CardHeader className="p-0 relative">
         <div className="relative w-full aspect-[16/9] bg-muted">
-          {recipe.imageUrl ? (
+          {displayImageUrl ? (
             <Image
-              src={recipe.imageUrl} 
+              src={displayImageUrl}
               alt={recipe.title}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
               className="object-cover"
               data-ai-hint="recipe food image"
-              priority={!recipe.id} 
+              priority={!recipe.id}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center rounded-t-lg bg-muted">
@@ -243,7 +252,7 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
 
       {user && (
         <CardFooter className="p-6 flex flex-col sm:flex-row justify-end gap-3 bg-muted/30 border-t">
-          {onDelete && recipe.id && (alreadySaved || isSavedRecipe) && ( 
+          {onDelete && recipe.id && (alreadySaved || isSavedRecipe) && (
             <Button
               onClick={() => handleDeleteRecipe(recipe.id!, false)}
               variant="destructive"

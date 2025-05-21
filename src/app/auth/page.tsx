@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import { toast, Bounce } from 'react-toastify';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthPage() {
@@ -21,12 +21,10 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
 
   const getRedirectUrl = () => {
     const redirect = searchParams.get('redirect');
-    // Basic validation: ensure it's a relative path within the app
-    if (redirect && redirect.startsWith('/')) {
+    if (redirect && redirect.startsWith('/') && redirect !== '/auth') {
       return redirect;
     }
     return '/'; // Default redirect to generate page
@@ -37,7 +35,9 @@ export default function AuthPage() {
     setIsLoading(true);
     try {
       if (!auth || !db) {
-        toast({ title: 'Initialization Error', description: 'Firebase services are not ready. Please try again later.', variant: 'destructive' });
+        toast.error('Initialization Error: Firebase services are not ready. Please try again later.', {
+          position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+        });
         setIsLoading(false);
         return;
       }
@@ -51,10 +51,14 @@ export default function AuthPage() {
           createdAt: serverTimestamp(),
         });
       }
-      toast({ title: 'Account Created!', description: 'You have successfully signed up.' });
+      toast.success('Account Created! You have successfully signed up.', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       router.push(getRedirectUrl());
     } catch (error: any) {
-      toast({ title: 'Sign Up Failed', description: error.message, variant: 'destructive' });
+      toast.error(error.message || 'Sign Up Failed', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -65,15 +69,21 @@ export default function AuthPage() {
     setIsLoading(true);
     try {
       if (!auth) {
-        toast({ title: 'Initialization Error', description: 'Firebase auth is not ready. Please try again later.', variant: 'destructive' });
+        toast.error('Initialization Error: Firebase auth is not ready. Please try again later.', {
+          position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+        });
         setIsLoading(false);
         return;
       }
       await signInWithEmailAndPassword(auth, email, password);
-      toast({ title: 'Login Successful!', description: 'Welcome back!' });
+      toast.success('Login Successful! Welcome back!', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       router.push(getRedirectUrl());
     } catch (error: any) {
-      toast({ title: 'Login Failed', description: error.message, variant: 'destructive' });
+      toast.error(error.message || 'Login Failed', {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     } finally {
       setIsLoading(false);
     }

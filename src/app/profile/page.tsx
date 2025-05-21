@@ -2,14 +2,14 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserCircle, Settings, Bookmark, Edit3, LogOut, Loader2, AlertTriangle } from "lucide-react";
 import { RecipeCard, type RecipeCardProps } from '@/components/recipe/RecipeCard';
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast, Bounce } from 'react-toastify';
 import { db } from '@/lib/firebase/config';
 import { collection, query, orderBy, getDocs, type Timestamp, doc, deleteDoc as firestoreDeleteDoc } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
@@ -21,7 +21,7 @@ interface FirebaseSavedRecipe extends GenerateRecipeOutput {
   id: string;
   savedAt: Timestamp;
   userId: string;
-  likeCount?: number; // Added for like count
+  likeCount?: number;
 }
 
 function SavedRecipeCardSkeleton() {
@@ -34,9 +34,9 @@ function SavedRecipeCardSkeleton() {
         <div className="h-6 w-3/4 bg-muted animate-pulse rounded"></div>
         <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
       </CardContent>
-      <CardFooter className="p-4 border-t">
+      <div className="p-4 border-t">
         <div className="h-8 w-20 bg-muted animate-pulse rounded-md ml-auto"></div>
-      </CardFooter>
+      </div>
     </Card>
   );
 }
@@ -45,7 +45,6 @@ function SavedRecipeCardSkeleton() {
 export default function ProfilePage() {
   const { user, loading: authLoading, logout } = useAuth();
   const router = useRouter();
-  const { toast } = useToast();
 
   const [savedRecipes, setSavedRecipes] = useState<FirebaseSavedRecipe[]>([]);
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
@@ -65,7 +64,9 @@ export default function ProfilePage() {
         try {
           if (!db) {
             setErrorLoadingRecipes("Firestore is not initialized. Please try again later.");
-            toast({ title: "Error", description: "Database connection not ready.", variant: "destructive" });
+            toast.error("Database connection not ready.", {
+              position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+            });
             setIsLoadingRecipes(false);
             return;
           }
@@ -76,23 +77,29 @@ export default function ProfilePage() {
         } catch (err: any) {
           console.error("Error fetching saved recipes:", err);
           setErrorLoadingRecipes(err.message || "Failed to load saved recipes.");
-          toast({ title: "Error", description: "Could not load your saved recipes.", variant: "destructive" });
+          toast.error("Could not load your saved recipes.", {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
         } finally {
           setIsLoadingRecipes(false);
         }
       };
       fetchRecipes();
     }
-  }, [user, toast]);
+  }, [user, router]);
 
   const handleDeleteRecipe = async (recipeId: string) => {
     if (!user || !db) return;
     try {
       await firestoreDeleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeId));
       setSavedRecipes(prev => prev.filter(r => r.id !== recipeId));
-      toast({ title: "Recipe Deleted", description: "The recipe has been removed from your saved list."});
+      toast.success("Recipe Deleted: The recipe has been removed from your saved list.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     } catch (error: any) {
-       toast({ title: "Error Deleting", description: error.message || "Could not delete recipe.", variant: "destructive"});
+       toast.error(error.message || "Could not delete recipe.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+       });
     }
   };
 
@@ -172,12 +179,15 @@ export default function ProfilePage() {
                 key={recipe.id}
                 id={recipe.id}
                 title={recipe.title}
-                imageUrl={recipe.imageUrl || "https://picsum.photos/200/300"}
+                imageUrl={recipe.imageUrl || "https://picsum.photos/600/400"}
                 cookTime={recipe.cookTime}
-                likes={recipe.likeCount || 0} // Pass the likeCount
+                likes={recipe.likeCount || 0}
                 dataAiHint="saved recipe food"
-                // onDelete prop is not available on RecipeCard, but we have handleDeleteRecipe for this page
-                // If a delete button is needed *on the card itself*, RecipeCard would need an onDelete prop
+                // onDelete prop is not available on RecipeCard for this page's context.
+                // The profile page manages deletion of its recipes directly.
+                // To enable a delete button on the card itself for the profile page,
+                // RecipeCard would need an onDelete prop, and ProfilePage would pass handleDeleteRecipe(recipe.id).
+                // For now, deletion is managed outside the card for ProfilePage.
               />
             ))}
           </div>
@@ -199,4 +209,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

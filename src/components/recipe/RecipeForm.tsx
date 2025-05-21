@@ -1,11 +1,11 @@
 
 "use client";
-import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
+import type { ServerGeneratedRecipeOutput } from '@/lib/actions'; // Updated import
 import { IngredientInput } from './IngredientInput';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useState, type ChangeEvent } from 'react';
-import { Loader2, UploadCloud, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Loader2, UploadCloud, Sparkles, Image as ImageIconLucide } from 'lucide-react'; // Added ImageIconLucide
 import { handleGenerateRecipe, handleRecognizeIngredients } from '@/lib/actions';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,12 +17,12 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Input } from '@/components/ui/input';
-import Image from 'next/image';
-import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image'; // Keep next/image
+import { toast, Bounce } from 'react-toastify';
 import { Separator } from '../ui/separator';
 
 interface RecipeFormProps {
-  onRecipeGenerated: (recipe: GenerateRecipeOutput | null, error?: string) => void;
+  onRecipeGenerated: (recipe: ServerGeneratedRecipeOutput | null, error?: string) => void;
   onSubmissionStart: () => void;
 }
 
@@ -42,11 +42,10 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     setRecognitionError(null);
-    setIngredients([]); // Clear ingredients when new image is selected
+    setIngredients([]);
     const file = event.target.files?.[0];
     if (file) {
       setSelectedImageFile(file);
@@ -64,7 +63,9 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
   const triggerImageRecognition = async () => {
     if (!imagePreview) {
       setRecognitionError("Please select an image first.");
-      toast({ title: "No Image", description: "Please select an image to recognize ingredients.", variant: "destructive" });
+      toast.error("No Image: Please select an image to recognize ingredients.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       return;
     }
     setIsRecognizing(true);
@@ -75,20 +76,28 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
       const result = await handleRecognizeIngredients(imagePreview);
       if ('error' in result) {
         setRecognitionError(result.error);
-        toast({ title: "Recognition Failed", description: result.error, variant: "destructive" });
+        toast.error(`Recognition Failed: ${result.error}`, {
+          position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+        });
         setIngredients([]);
       } else {
         setIngredients(result.recognizedIngredients || []);
         if (result.recognizedIngredients && result.recognizedIngredients.length > 0) {
-          toast({ title: "Ingredients Recognized!", description: "Review and adjust the ingredients below." });
+          toast.success("Ingredients Recognized! Review and adjust the ingredients below.", {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
         } else {
-          toast({ title: "No Ingredients Found", description: "Could not identify ingredients in the image, or image was unclear. Try adding manually." });
+          toast.info("No Ingredients Found: Could not identify ingredients in the image, or image was unclear. Try adding manually.", {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
         }
       }
     } catch (e: any) {
       const errorMessage = e.message || "Failed to recognize ingredients.";
       setRecognitionError(errorMessage);
-      toast({ title: "Recognition Error", description: errorMessage, variant: "destructive" });
+      toast.error(`Recognition Error: ${errorMessage}`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       setIngredients([]);
     } finally {
       setIsRecognizing(false);
@@ -139,17 +148,17 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           <div className="space-y-3 p-4 border rounded-lg bg-card shadow-sm">
             <Label htmlFor="image-upload" className="text-base font-medium flex items-center gap-2 text-primary">
               <UploadCloud className="h-5 w-5" />
               Recognize Ingredients from Image (Optional)
             </Label>
-            <Input 
-              id="image-upload" 
-              type="file" 
-              accept="image/*" 
-              onChange={handleImageChange} 
+            <Input
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
               className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             />
             {imagePreview && (
@@ -157,9 +166,9 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
                 <div className="relative w-full aspect-video rounded-md overflow-hidden border shadow-inner">
                   <Image src={imagePreview} alt="Selected ingredients preview" layout="fill" objectFit="contain" data-ai-hint="food ingredients" />
                 </div>
-                <Button 
-                  type="button" 
-                  onClick={triggerImageRecognition} 
+                <Button
+                  type="button"
+                  onClick={triggerImageRecognition}
                   disabled={isRecognizing || !imagePreview}
                   className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 >
@@ -170,10 +179,9 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
             )}
             {recognitionError && <p className="text-sm text-destructive text-center mt-2">{recognitionError}</p>}
           </div>
-          
+
 
           <div className="w-full max-w-full overflow-hidden flex items-center text-muted-foreground">
-            <div className="flex-grow h-px bg-border" />
             <span className="px-3 text-sm whitespace-nowrap">OR</span>
             <div className="flex-grow h-px bg-border" />
           </div>
@@ -237,7 +245,7 @@ export function RecipeForm({ onRecipeGenerated, onSubmissionStart }: RecipeFormP
                 disabled={isLoading || ingredients.length === 0}
                 className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-3 text-base rounded-lg shadow-md transition-transform hover:scale-105"
               >
-                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
                 Generate Recipe
             </Button>
           </div>

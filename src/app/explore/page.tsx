@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { RecipeCard, type RecipeCardProps } from '@/components/recipe/RecipeCard';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, WifiOff, BookHeart } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast, Bounce } from 'react-toastify';
 import { db } from '@/lib/firebase/config';
 import { collection, query, getDocs, limit, type Timestamp, orderBy, doc, updateDoc, increment } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
@@ -16,7 +16,7 @@ interface PublicRecipe extends Omit<GenerateRecipeOutput, 'nutritionalInformatio
   savedAt: Timestamp;
   authorDisplayName?: string;
   authorId?: string;
-  likeCount?: number; // Added for like count
+  likeCount?: number;
 }
 
 function RecipeCardSkeleton() {
@@ -46,7 +46,6 @@ export default function ExplorePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -58,12 +57,14 @@ export default function ExplorePage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (user) { 
+    if (user) {
       const fetchPublicRecipes = async () => {
         if (!db) {
           setError("Database not initialized. Please try again later.");
           setIsLoadingRecipes(false);
-          toast({title: "Error", description: "Could not connect to the database.", variant: "destructive"});
+          toast.error("Could not connect to the database.", {
+            position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
           return;
         }
         setIsLoadingRecipes(true);
@@ -84,10 +85,10 @@ export default function ExplorePage() {
             const recipeCardData: RecipeCardProps = {
               id: docSnap.id,
               title: data.title,
-              imageUrl: data.imageUrl || "https://picsum.photos/200/300",
+              imageUrl: data.imageUrl || "https://picsum.photos/600/400",
               cookTime: data.cookTime,
               author: data.authorDisplayName || "Community Chef",
-              likes: data.likeCount || 0, // Use likeCount from Firestore
+              likes: data.likeCount || 0,
               dataAiHint: 'food recipe'
             };
             if (querySnapshot.docs.length > 0 && docSnap.id === querySnapshot.docs[0].id) {
@@ -99,17 +100,20 @@ export default function ExplorePage() {
           setRecipes(fetchedRecipes);
         } catch (err: any) {
           console.error("Error fetching public recipes:", err);
+          let toastMessage = "Could not fetch community recipes.";
           if (err.code === 'failed-precondition') {
                setError("Query requires an index. Please check Firestore console for index creation link or create manually: Collection 'publicExploreRecipes', Field 'savedAt', Order 'Descending'.");
-               toast({ title: "Indexing Required", description: "A database index is needed to show recipes. Check console.", variant: "destructive", duration: 10000 });
+               toastMessage = "A database index is needed to show recipes. Check console.";
           } else if (err.code === 'permission-denied') {
               setError("You don't have permission to view these recipes. Please ensure you are logged in and have the correct Firestore rules configured.");
-              toast({ title: "Permission Denied", description: "Could not fetch community recipes due to permissions.", variant: "destructive" });
+              toastMessage = "Could not fetch community recipes due to permissions.";
           }
           else {
               setError(err.message || "Failed to load recipes for exploration.");
-              toast({ title: "Error Loading Recipes", description: "Could not fetch community recipes.", variant: "destructive" });
           }
+          toast.error(toastMessage, {
+            position: "top-right", autoClose: 10000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+          });
         } finally {
           setIsLoadingRecipes(false);
         }
@@ -118,7 +122,7 @@ export default function ExplorePage() {
     } else if (!authLoading && !user) {
       setIsLoadingRecipes(false);
     }
-  }, [user, authLoading, toast]);
+  }, [user, authLoading, router]);
 
   const filteredRecipes = recipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -127,23 +131,27 @@ export default function ExplorePage() {
 
   const handleLike = async (recipeId: string) => {
     if (!db || !user) {
-      toast({ title: "Error", description: "Cannot like recipe. Please ensure you are logged in and database is connected.", variant: "destructive" });
+      toast.error("Cannot like recipe. Please ensure you are logged in and database is connected.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       return;
     }
 
-    // Optimistically update UI
     setRecipes(prevRecipes => prevRecipes.map(r => r.id === recipeId ? {...r, likes: (r.likes || 0) + 1} : r));
-    
+
     try {
       const recipeRef = doc(db, "publicExploreRecipes", recipeId);
       await updateDoc(recipeRef, {
         likeCount: increment(1)
       });
-      toast({ title: "Liked!", description: `You liked the recipe.` });
+      toast.success(`You liked the recipe.`, {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
     } catch (error: any) {
       console.error("Error updating like count:", error);
-      toast({ title: "Like Failed", description: "Could not update like count. Please try again.", variant: "destructive" });
-      // Revert optimistic update on error
+      toast.error("Like Failed: Could not update like count. Please try again.", {
+        position: "top-right", autoClose: 5000, hideProgressBar: false, closeOnClick: false, pauseOnHover: true, draggable: true, progress: undefined, theme: "light", transition: Bounce,
+      });
       setRecipes(prevRecipes => prevRecipes.map(r => r.id === recipeId ? {...r, likes: (r.likes || 0) - 1} : r));
     }
   };
@@ -194,7 +202,7 @@ export default function ExplorePage() {
             <RecipeCard
               key={recipe.id}
               {...recipe}
-              onLike={() => handleLike(recipe.id)} // Pass recipe.id to handleLike
+              onLike={() => handleLike(recipe.id)}
             />
           ))}
         </div>
