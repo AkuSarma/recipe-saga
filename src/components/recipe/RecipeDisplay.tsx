@@ -36,6 +36,8 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         const q = query(
           collection(db, "users", user.uid, "savedRecipes"),
           where("title", "==", recipe.title),
+          // Consider adding more fields to where clause if title alone isn't unique enough
+          // e.g., where("cookTime", "==", recipe.cookTime)
         );
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
@@ -47,10 +49,11 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         }
       } catch (error) {
         console.error("[RecipeDisplay] Error checking saved status:", error);
+        // Optionally, show a toast for this error
       }
     };
     checkSavedStatus();
-  }, [user, recipe.title, recipe.cookTime, recipe.instructions, recipe.nutritionalInformation, isSavedRecipe]); // Added more dependencies for better check
+  }, [user, recipe.title, recipe.cookTime, recipe.instructions, recipe.nutritionalInformation, isSavedRecipe]);
 
 
   const handleSaveRecipe = async () => {
@@ -84,7 +87,8 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
         instructions: recipe.instructions || "No instructions provided.",
         cookTime: recipe.cookTime || "N/A",
         nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.",
-        imageUrl: recipe.imageUrl || "https://picsum.photos/200/300", 
+        // imageUrl will be handled based on whether it's a data URI or a regular URL
+        imageUrl: recipe.imageUrl && recipe.imageUrl.startsWith('data:image') ? "https://picsum.photos/200/300" : recipe.imageUrl || "https://picsum.photos/200/300",
       };
       
       console.log('[RecipeDisplay] handleSaveRecipe: Base recipe data for save:', JSON.stringify(recipeDataToSave));
@@ -103,10 +107,15 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
       // 2. Save to public collection for Explore page
       const publicRecipeRef = doc(collection(db, 'publicExploreRecipes'));
       const recipeDataForPublic = {
-        ...recipeDataToSave, // Now includes instructions and nutritionalInformation
+        title: recipe.title || "Unnamed Recipe",
+        instructions: recipe.instructions || "No instructions provided.", // Now included
+        cookTime: recipe.cookTime || "N/A",
+        nutritionalInformation: recipe.nutritionalInformation || "No nutritional information available.", // Now included
+        imageUrl: recipe.imageUrl && recipe.imageUrl.startsWith('data:image') ? "https://picsum.photos/200/300" : recipe.imageUrl || "https://picsum.photos/200/300",
         savedAt: serverTimestamp(),
         authorId: user.uid,
         authorDisplayName: user.displayName || "Community Chef",
+        likeCount: 0, // Initialize likeCount
       };
 
       console.log('[RecipeDisplay] handleSaveRecipe: Data for public save (full):', JSON.stringify(recipeDataForPublic));
@@ -140,13 +149,13 @@ export function RecipeDisplay({ recipe, isSavedRecipe = false, onDelete }: Recip
     }
     setIsDeleting(true);
     try {
-      // For now, only delete from user's private collection.
-      // Deleting from publicExploreRecipes if it was an unsave action from a recipe that the user originally shared
-      // would require knowing the ID of the public document, which might differ from the user's private document ID.
-      // This could be enhanced later if needed.
       await deleteDoc(doc(db, "users", user.uid, "savedRecipes", recipeIdToDelete));
       console.log(`[RecipeDisplay] handleDeleteRecipe: Successfully deleted/unsaved from user's private collection.`);
       
+      // Note: Deleting from publicExploreRecipes when a user unsaves is complex
+      // if multiple users could have effectively "saved" the same public recipe.
+      // For now, we only remove from the user's private list.
+
       toast({
         title: isUnsaveAction ? "Recipe Unsaved" : "Recipe Deleted",
         description: `${recipe.title} has been removed from your collection.`,

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Search, Loader2, WifiOff, BookHeart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase/config';
-import { collection, query, getDocs, limit, type Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, limit, type Timestamp, orderBy, doc, updateDoc, increment } from 'firebase/firestore';
 import type { GenerateRecipeOutput } from '@/ai/flows/generate-recipe';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
@@ -16,6 +16,7 @@ interface PublicRecipe extends Omit<GenerateRecipeOutput, 'nutritionalInformatio
   savedAt: Timestamp;
   authorDisplayName?: string;
   authorId?: string;
+  likeCount?: number; // Added for like count
 }
 
 function RecipeCardSkeleton() {
@@ -57,7 +58,7 @@ export default function ExplorePage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (user) { // Only fetch if user is authenticated
+    if (user) { 
       const fetchPublicRecipes = async () => {
         if (!db) {
           setError("Database not initialized. Please try again later.");
@@ -78,18 +79,18 @@ export default function ExplorePage() {
           console.log("Query snapshot empty:", querySnapshot.empty);
           console.log("Number of docs fetched:", querySnapshot.docs.length);
 
-          const fetchedRecipes = querySnapshot.docs.map(doc => {
-            const data = doc.data() as PublicRecipe;
+          const fetchedRecipes = querySnapshot.docs.map(docSnap => {
+            const data = docSnap.data() as PublicRecipe;
             const recipeCardData: RecipeCardProps = {
-              id: doc.id,
+              id: docSnap.id,
               title: data.title,
               imageUrl: data.imageUrl || "https://picsum.photos/200/300",
               cookTime: data.cookTime,
               author: data.authorDisplayName || "Community Chef",
-              likes: Math.floor(Math.random() * 100), // Likes are currently mock for explore
+              likes: data.likeCount || 0, // Use likeCount from Firestore
               dataAiHint: 'food recipe'
             };
-            if (querySnapshot.docs.length > 0 && doc.id === querySnapshot.docs[0].id) {
+            if (querySnapshot.docs.length > 0 && docSnap.id === querySnapshot.docs[0].id) {
                console.log("First doc data from Firestore:", data);
                console.log("Mapped first recipe card data:", recipeCardData);
             }
@@ -115,7 +116,6 @@ export default function ExplorePage() {
       };
       fetchPublicRecipes();
     } else if (!authLoading && !user) {
-      // If not loading and no user, we've already redirected, but good to stop recipe loading.
       setIsLoadingRecipes(false);
     }
   }, [user, authLoading, toast]);
@@ -125,9 +125,27 @@ export default function ExplorePage() {
     (recipe.author && recipe.author.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleLike = (id: string) => {
-    toast({ title: "Liked!", description: `You liked recipe ${id}. (Demo)` });
-    setRecipes(prevRecipes => prevRecipes.map(r => r.id === id ? {...r, likes: (r.likes || 0) + 1} : r));
+  const handleLike = async (recipeId: string) => {
+    if (!db || !user) {
+      toast({ title: "Error", description: "Cannot like recipe. Please ensure you are logged in and database is connected.", variant: "destructive" });
+      return;
+    }
+
+    // Optimistically update UI
+    setRecipes(prevRecipes => prevRecipes.map(r => r.id === recipeId ? {...r, likes: (r.likes || 0) + 1} : r));
+    
+    try {
+      const recipeRef = doc(db, "publicExploreRecipes", recipeId);
+      await updateDoc(recipeRef, {
+        likeCount: increment(1)
+      });
+      toast({ title: "Liked!", description: `You liked the recipe.` });
+    } catch (error: any) {
+      console.error("Error updating like count:", error);
+      toast({ title: "Like Failed", description: "Could not update like count. Please try again.", variant: "destructive" });
+      // Revert optimistic update on error
+      setRecipes(prevRecipes => prevRecipes.map(r => r.id === recipeId ? {...r, likes: (r.likes || 0) - 1} : r));
+    }
   };
 
 
@@ -176,7 +194,7 @@ export default function ExplorePage() {
             <RecipeCard
               key={recipe.id}
               {...recipe}
-              onLike={() => handleLike(recipe.id)}
+              onLike={() => handleLike(recipe.id)} // Pass recipe.id to handleLike
             />
           ))}
         </div>
