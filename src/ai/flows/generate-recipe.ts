@@ -1,14 +1,6 @@
 
 'use server'
 
-/**
- * @fileOverview Recipe generation flow from a list of ingredients, mood, and dietary preference.
- *
- * - generateRecipe - A function that handles the recipe generation process.
- * - GenerateRecipeInput - The input type for the generateRecipe function.
- * - GenerateRecipeOutput - The return type for the generateRecipe function.
- */
-
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
